@@ -25,41 +25,38 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 - Mapear Grafana como sistema de estudio: monorepo + demo Cursor + proceso OSS.
 
 **Deep-dive**
-- Por qué un monorepo de ~3M LoC es el laboratorio correcto (límites reales, CI real, ownership real).
-- El demo `novarz/grafana` como *staging environment* de agentes: ramas `demo/start`, Jira SDFD, skills de reset — no es “Grafana production”, es un harness pedagógico.
+- Sistema agentic = frontera + estado durable + pipeline. La norma vive en el repo, no en el chat.
+- Cuatro capas (código, contexto, proceso humano, CI/entorno). El harness tiene punto de restauración; el ensayo no es el producto.
 
 **Lab**
-- Inventario del top-level tree; clasificar cada carpeta en: código, contexto agentic, proceso humano, CI, env.
+- Cinco artefactos de cualquier sistema, clasificados por capa. Como mucho un path de Grafana. Texto: `capitulos/00-01-caso-grafana.md`.
 
 **Evaluación**
-- Diagrama de una página: “humano / agente / CI / estado durable” con flechas y 5 paths reales.
+- Diagrama de una página: humano / agente / CI / estado durable. Aprueba si alguien que no conoce el producto dice dónde se detiene el agente.
 
 **Anti-patrones**
-- Tratar `AGENTS.md` como README de marketing; ignorar CODEOWNERS y cadencias FE/BE.
+- Archivar el fichero de instrucciones tras leerlo una vez. Ignorar dueños y cadencias.
 
 ---
 
 ## Capítulo 1 — System boundaries: módulos del monorepo como contratos
 
 **Objetivos**
-- Definir fronteras agent-safe: qué puede tocar un agente en un turno sin romper el sistema.
-- Relacionar `pkg/`, `public/app/`, `packages/`, `apps/`, `kinds/` con blast radius y codegen.
+- Definir una frontera agent-safe: qué puede tocar un agente en un turno sin romper el sistema.
+- Estimar blast radius, partir por cadencia y reconocer cuándo hay que regenerar en vez de editar la salida.
 
 **Deep-dive**
-- Dual workspace: `go.work` vs Yarn workspaces / `nx.json`.
-- Apps SDK (`apps/dashboard`, `apps/folder`, …) vs `pkg/services/<domain>/`.
-- Shared packages (`@grafana/data|ui|runtime|schema`) como *API interna* entre equipos.
-- Lectura guiada: `contribute/architecture/k8s-inspired-backend-arch.md` — API layer vs unified storage.
+- Frontera = contrato (toolchain, dueños, validación propia). Blast radius = quién se rompe, no cuántas líneas.
+- Un PR por cadencia. Se edita la fuente y se regenera. El tamaño de un turno es el número de fronteras que cruza.
 
 **Lab**
-- Elegir un bug ficticio “cambiar título de panel”. Trazar archivos tocados en FE-only vs schema change en `kinds/`.
-- Comparar un cambio en `packages/grafana-ui` vs `public/app/features/dashboard`.
+- «Cambiar el título de un panel»: plan de solo presentación y plan de cambio de modelo. Texto: `capitulos/00-01-caso-grafana.md`.
 
 **Evaluación**
-- Matriz: cambio × frontera × tests mínimos × owners (CODEOWNERS).
+- Matriz: frontera × blast radius × tests × dueños × PRs × comando de generación.
 
 **Anti-patrones**
-- Un solo PR “full stack” cuando AGENTS.md pide separar FE/BE; editar generated files a mano.
+- Un solo PR para dos cadencias. Editar a mano un fichero generado.
 
 ---
 
@@ -70,21 +67,17 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 - Evitar duplicación y drift entre docs humanas y agent instructions.
 
 **Deep-dive**
-- Anatomía de `AGENTS.md` (v2): overview, principles, human gates, commands, architecture tables, Cursor Cloud gotchas, demo constraints.
-- Patrón de `globs` en `public/app/features/alerting/unified/AGENTS.md`.
-- `docs/AGENTS.md` vs `contribute/style-guides/*`: cuándo el agente lee docs y cuándo código.
-- Compatibilidad como contexto: `pkg/storage/unified/AGENTS.md`.
-- Journeys: `public/app/core/journeys/AGENTS.md` + `journey-tracking.md`.
+- Pila: raíz → zona con glob → skill → guía humana por enlace.
+- La zona especializa y no revoca la raíz. Una regla, un sitio. Cada fichero nombra un comando real y dos modos de fallo.
 
 **Lab**
-- Redactar un AGENTS.md scoped ficticio para `pkg/tsdb/` siguiendo el patrón alerting (globs, links, no duplicar style guide).
-- Detectar 3 inconsistencias posibles entre root AGENTS y un scoped AGENTS (ejercicio de review).
+- AGENTS de zona ficticio (glob, enlaces, skill, tres reglas locales, dos fallos) y tres choques raíz/zona para revisar. Destino Grafana opcional: `pkg/tsdb/`. Texto: `capitulos/02-contexto-agentes.md`.
 
 **Evaluación**
-- Rubrica de “contexto bueno”: accionable, scoped, referencial (links), con failure modes explícitos.
+- Rúbrica: accionable, acotado, referencial, modos de fallo, compatible con la raíz.
 
 **Anti-patrones**
-- Pegar el style guide entero en AGENTS; reglas contradictorias root vs squad; contexto que no nombra comandos reales del Makefile.
+- Pegar la guía de estilo. Dos órdenes opuestas. Comandos que el repo no tiene.
 
 ---
 
@@ -309,7 +302,7 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 
 ## Principios pedagógicos del curso
 
-1. **Paths > tips:** cada afirmación se ancla a un archivo del monorepo.
+1. **Principio, luego un ancla:** cada idea se entiende sin Grafana; como mucho un path por sección. El inventario de rutas vive en `example-map.md`.
 2. **Sistemas > prompts:** se diseña contexto, topología, pipelines y evaluación.
 3. **Human gates son feature, no bug:** la aprobación explícita es parte de la arquitectura.
 4. **Demo ≠ prod:** el fork Cursor enseña harnesses; las lecciones de security/CI aplican al Grafana real.

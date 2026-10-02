@@ -1,146 +1,162 @@
-# Arquitectura Cursor avanzada — Capítulos 0–1 (caso Grafana)
+# Capítulos 0–1 — Framing y fronteras
 
-Estos dos capítulos sientan la base de todo el curso: un agente en un monorepo no es un autocompletado con esteroides, es un componente más de un sistema con fronteras, estado durable, pipelines y personas que aprueban. El capítulo 0 cambia el marco mental (de "asistente de código" a "sistema agentic") usando [novarz/grafana](https://github.com/novarz/grafana) como laboratorio; el capítulo 1 convierte ese marco en algo operable, leyendo los módulos del monorepo (`pkg/`, `public/app/`, `packages/`, `apps/`, `kinds/`) como contratos con un radio de impacto y un camino de codegen propios. La conclusión práctica: antes de pedirle nada a un agente, Sergio, decide qué frontera va a cruzar, qué estado toca y quién tiene que aprobarlo.
+Estos dos capítulos se leen sin conocer Grafana. Al terminarlos tienes que poder explicar en voz alta qué es una frontera y qué es el blast radius. Grafana aparece solo como ejemplo breve; el inventario de rutas está en [example-map.md](../example-map.md).
 
-*Fuente: rama `main` de novarz/grafana, leída el 1 oct 2026 · Basado en el outline y el mapa de ejemplos del curso*
+Cada idea sigue el mismo bloque: **qué es → por qué importa → best practice → ejemplo corto → ejercicio mental**. El ejemplo se puede saltar.
 
-## Cómo leer estos capítulos
+*Los hechos de Grafana salen de `main` de [novarz/grafana](https://github.com/novarz/grafana), comprobados el 2 oct 2026.*
 
-Cada capítulo sigue la misma estructura: objetivos, un deep-dive largo con rutas reales del repo, un laboratorio que se hace sobre el árbol de ficheros (sin modificar el repositorio), criterios de evaluación y los anti-patrones que más daño hacen. Los laboratorios están pensados para hacerse con Cursor abierto sobre el repo, pero el entregable siempre es razonamiento escrito, no código mergeado. Prerrequisito: haber leído entero [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md) y hojeado [.cursor/101-SCRIPT.md](https://github.com/novarz/grafana/blob/main/.cursor/101-SCRIPT.md).
+## Capítulo 0 — De asistente a sistema agentic
 
-## Capítulo 0 · Objetivos
+**Objetivos.** Distinguir un chat con permiso de escritura de un sistema con fronteras, estado y pipeline. Nombrar en qué capa actúa el agente. Separar las reglas del ensayo de las reglas del producto.
 
-Al terminar este capítulo deberías ser capaz de distinguir con precisión entre dos formas de trabajar con IA en un repositorio. La primera es el *tool-use ad-hoc*: abres el chat, describes un cambio, el modelo lee algunos ficheros, edita, y tú juzgas el resultado a ojo. La segunda es una *arquitectura de agentes*: el agente opera dentro de fronteras declaradas, consume contexto diseñado a propósito, deja estado en sitios conocidos y entrega su trabajo a un pipeline (CI, CODEOWNERS, revisión humana) que lo valida. El segundo objetivo es mapear Grafana como sistema de estudio: un monorepo grande y real, una capa de demo de Cursor encima, y el proceso OSS de Grafana alrededor.
+### Un sistema agentic tiene frontera, estado y salida
 
-## Capítulo 0 · De asistente a sistema agentic
+1. **Qué es** — Un asistente contesta un mensaje y el resultado se juzga a ojo. Un sistema agentic mete a ese modelo dentro de piezas que ya viven en el repositorio: una frontera que acota qué puede tocar, un estado que sigue ahí cuando el chat se cierra, y un pipeline por el que sale el cambio (tests, dueños, una persona que aprueba).
+2. **Por qué importa** — Sin frontera, el blast radius del turno es el repositorio entero. Sin estado durable, el agente vuelve a decidir cosas que el repo ya decidió (cómo se genera código, cómo se despliega). Sin pipeline, el review llega cuando el PR ya mezcló cadencias y revisores.
+3. **Best practice** — Antes de encargar el cambio, escribe tres líneas: frontera, estado que toca, quién aprueba. Si una línea queda vacía, ese turno no es trabajo autónomo.
+4. **Ejemplo (Grafana, opcional)** — El fichero raíz de instrucciones declara una puerta humana: antes de `git push`, parar y pedir aprobación. Que la tarea diga «abre un PR» no es permiso para empujar. [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md)
+5. **Ejercicio mental** — En el último diff que aceptaste desde un chat, ¿dónde estaba escrita la frontera?
 
-Empecemos por la diferencia que importa. Un asistente responde a una petición; un sistema agentic tiene **fronteras** (qué puede tocar), **estado** (qué sobrevive al chat) y **pipelines** (por dónde sale su trabajo y quién lo valida). En el modo asistente, la calidad depende casi por completo del prompt y de tu revisión. En el modo sistema, la calidad la sostienen piezas que existen fuera de la conversación: ficheros de contexto versionados, comandos canónicos, hooks, workflows de CI y reglas de ownership. Lo interesante es que en Grafana casi todas esas piezas ya existen, escritas para humanos, y el trabajo de arquitectura consiste en hacerlas legibles y vinculantes para un agente.
+### La calidad vive en el repositorio
 
-Mira cómo arranca [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md): *"This file provides guidance to AI agents when working with code in the Grafana repository."* No es un README. Lleva versión (`version: 2.0.0`), declara principios ("Separate PRs for frontend and backend changes (deployed at different cadences)"), fija una puerta humana explícita ("Before running `git push`, stop and get explicit human approval") y enumera comandos reales del Makefile y de Yarn. Cada una de esas líneas es una pieza de arquitectura: la versión permite razonar sobre drift, el principio FE/BE codifica una restricción de despliegue, la puerta humana define el borde del sistema autónomo y los comandos son la superficie de herramientas sancionada.
+1. **Qué es** — Lo que sostiene al agente está versionado junto al código: instrucciones, comandos canónicos, hooks, checks del PR y el mapa de quién revisa cada ruta. El chat consulta esas piezas. El chat no las guarda.
+2. **Por qué importa** — Un prompt bueno no llega al siguiente agente ni al siguiente revisor. Si la regla vive solo en la conversación, el turno siguiente la rompe y el review discute gustos. El blast radius de una norma no escrita es todo PR futuro.
+3. **Best practice** — Toda restricción que el agente deba cumplir mañana se commitea en la capa que le toca: instrucciones, proceso humano o CI.
+4. **Ejercicio mental** — Elige una norma que tu equipo «ya sabe». ¿Un agente nuevo la encontraría sin que se la cuentes?
 
-> **La idea central del capítulo.** Un agente en Grafana no "escribe código"; propone transiciones de estado sobre un sistema que ya tiene dueños, cadencias y validadores. Diseñar para eso es lo que separa un sistema agentic de un chat con permisos de escritura.
+### Cuatro capas sobre el mismo árbol
 
-### Por qué un monorepo de ~3M LoC es el laboratorio correcto
+1. **Qué es** — Las mismas carpetas sirven a cuatro capas. **Código:** lo que se compila y se despliega. **Contexto:** lo que el agente lee para decidir. **Proceso humano:** cómo entra un cambio y quién lo firma. **CI y entorno:** lo que valida y lo que ejecuta. En un turno el agente escribe en una capa y las otras solo las lee, salvo que el encargo sea cambiarlas.
+2. **Por qué importa** — Confundir la capa equivoca el blast radius. Retocar dueños, plantillas o un check para «que el PR pase» cambia las reglas del sistema, y el review de producto no está mirando eso.
+3. **Best practice** — Clasifica cada fichero con una pregunta: ¿quién se rompe si esto cambia? La respuesta dice la capa y si este turno puede editarlo.
+4. **Ejercicio mental** — Un fichero de valores por defecto de configuración. ¿Es código, estado durable o entorno, y quién se rompe si un agente lo reescribe?
 
-Los repos pequeños engañan. En un proyecto de juguete todo cabe en contexto, no hay dueños distintos, el CI tarda segundos y un cambio "full stack" no rompe nada. Grafana, con del orden de tres millones de líneas, te quita esas muletas. Tiene límites reales: backend Go en [pkg/](https://github.com/novarz/grafana/blob/main/pkg/), frontend React en [public/app/](https://github.com/novarz/grafana/blob/main/public/app/), librerías publicadas en [packages/](https://github.com/novarz/grafana/blob/main/packages/), apps del App SDK en [apps/](https://github.com/novarz/grafana/blob/main/apps/) y schemas generativos en [kinds/](https://github.com/novarz/grafana/blob/main/kinds/). Tiene CI real: casi un centenar de workflows en [.github/workflows/](https://github.com/novarz/grafana/blob/main/.github/workflows/). Y tiene ownership real: [.github/CODEOWNERS](https://github.com/novarz/grafana/blob/main/.github/CODEOWNERS) ocupa unas 1.450 líneas y reparte el repo entre decenas de squads. Un agente que funciona bien aquí funciona bien en casi cualquier sitio; uno que solo funciona en repos pequeños no está diseñado, está teniendo suerte.
+### El ensayo tiene punto de restauración
 
-Hay además un detalle que hace de Grafana un caso especialmente didáctico: las fronteras no son solo de carpetas, son de **tiempo**. AGENTS.md avisa de que unified storage ([pkg/storage/unified/](https://github.com/novarz/grafana/blob/main/pkg/storage/unified/)) "can be deployed as separate services at a different cadence than the Grafana API layer", y de que los cambios que cruzan ambas capas "must be backwards compatible in both directions". Es decir, dos ficheros en el mismo commit pueden acabar ejecutándose en versiones distintas en producción. Un agente que no sabe esto escribirá código que compila y pasa los tests locales y aun así rompe un despliegue.
+1. **Qué es** — Un harness es un entorno para practicar con agentes: estado inicial conocido, una forma de volver a él, y un reparto de quién arranca procesos y quién edita. El producto es lo que ejecutan los usuarios. Fronteras, CI y ownership se aprenden en el ensayo y valen en el producto. Las reglas del ensayo (tickets de la demo, rama de reset) se quedan en el ensayo.
+2. **Por qué importa** — Si el agente trata el ensayo como producción, dispara acciones de demo sobre la rama real. Si tú tratas el producto como ensayo, cuelas un atajo de demo en un PR que va a mergearse. El review no distingue las dos cosas si el fichero de instrucciones tampoco las distingue.
+3. **Best practice** — En las instrucciones, marca qué reglas son del ensayo y cuáles son del sistema. Deja escrito el comando que devuelve el entorno a un estado conocido y quién puede ejecutarlo.
+4. **Ejemplo (Grafana, opcional)** — [`.cursor/reset-demo.sh`](https://github.com/novarz/grafana/blob/main/.cursor/reset-demo.sh) fija `main` en el pin `origin/demo/start`. Eso es harness. La regla de PRs separados por cadencia, en el mismo repo, es del producto.
+5. **Ejercicio mental** — ¿Qué comando devolvería tu repo a un estado conocido después de una demo, y quién tiene permiso de lanzarlo?
 
-### novarz/grafana como harness pedagógico, no como Grafana production
+## Capítulo 0 · Laboratorio
 
-El fork novarz/grafana no es el Grafana que despliega Grafana Labs; es un *staging environment* de agentes montado para las demos Cursor 101/201. Conviene tenerlo muy claro, porque una parte de AGENTS.md describe ese harness y no el producto. El bloque "Cursor 101/201 demo" establece que el tracker es Jira SDFD ("Do not use Linear"), que SDFD-1, SDFD-2 y SDFD-28 no se implementan en `main` sino en una rama demo, que el punto de restauración es `demo/start` y que el reset se hace con la skill `reset-demo` o con [.cursor/reset-demo.sh](https://github.com/novarz/grafana/blob/main/.cursor/reset-demo.sh), que "pins `main` to `origin/demo/start`". También fija quién arranca qué: "Do not start webpack, `yarn start`, `make run`, or grafana-server from an agent terminal. The human starts Grafana in a login shell."
+En papel, dibuja cuatro cajas: código, contexto, proceso humano, CI y entorno. Coloca cinco artefactos de un sistema que conozcas. Uno tiene que ser ambiguo: justifica la caja con «quién se rompe». En una segunda pasada, tacha lo que un agente no vería si solo leyera el README. Lo tachado es contexto que falta (capítulo 2).
 
-Lee esas reglas como lo que son: un **harness**. Un harness tiene un estado inicial conocido (la rama `demo/start`), una forma de volver a él (el script de reset), una división de responsabilidades (el humano levanta el servidor, el agente edita) y un sistema de tickets acotado (SDFD). Es exactamente lo que necesitas para que un experimento con agentes sea reproducible. La lección transferible no es "usa Jira SDFD", sino "todo entorno donde operan agentes necesita un punto de restauración, una frontera de procesos y un tracker con estados controlados". Lo que aprendas sobre seguridad, CI y ownership sí aplica al Grafana real; lo que aprendas sobre SDFD y ramas demo aplica al diseño de harnesses.
+Si anclas el diagrama a Grafana, usa un solo fichero de [example-map.md](../example-map.md). Este laboratorio no es un inventario de carpetas.
 
-### Las cuatro capas del sistema
+## Capítulo 0 · Rúbrica
 
-Para el resto del curso vamos a mirar el repo en cuatro capas que se superponen sobre el mismo árbol. La capa de **código** es lo que se compila y se despliega. La capa de **contexto agentic** es lo que el agente lee para decidir: AGENTS.md raíz, los AGENTS.md por directorio que la raíz enumera (como [docs/AGENTS.md](https://github.com/novarz/grafana/blob/main/docs/AGENTS.md) o [pkg/storage/unified/AGENTS.md](https://github.com/novarz/grafana/blob/main/pkg/storage/unified/AGENTS.md)) y las skills de [.cursor/](https://github.com/novarz/grafana/blob/main/.cursor/). La capa de **proceso humano** es cómo entra y sale el cambio: [contribute/](https://github.com/novarz/grafana/blob/main/contribute/), CODEOWNERS, las plantillas de PR. La capa de **CI y entorno** es lo que valida y ejecuta: los workflows, [devenv/](https://github.com/novarz/grafana/blob/main/devenv/), [conf/](https://github.com/novarz/grafana/blob/main/conf/), [e2e-playwright/](https://github.com/novarz/grafana/blob/main/e2e-playwright/). Un agente bien diseñado sabe en cada momento en qué capa está actuando y cuál le toca solo leer.
+Entregable: un diagrama de una página con cuatro actores (humano, agente, CI, estado durable) y flechas que sean transiciones (lee contexto, edita, una persona aprueba, CI valida, el merge cambia estado).
 
-| Capa | Rutas representativas | El agente… |
+| | Aprueba | No aprueba |
 | --- | --- | --- |
-| Código | `pkg/`, `public/app/`, `packages/`, `apps/`, `kinds/` | Edita, dentro de una frontera |
-| Contexto agentic | `AGENTS.md`, `.cursor/`, AGENTS.md por directorio | Lee siempre; edita solo si se le pide |
-| Proceso humano | `contribute/`, `.github/CODEOWNERS` | Respeta; nunca sustituye |
-| CI y entorno | `.github/workflows/`, `devenv/`, `conf/`, `e2e-playwright/` | Predice y ejecuta lo sancionado |
-
-## Capítulo 0 · Laboratorio: inventario del top-level
-
-Abre la raíz del repo en Cursor y haz un inventario completo de lo que cuelga de ella. Para cada carpeta y fichero relevante, asígnale una de cinco categorías: código, contexto agentic, proceso humano, CI o entorno. La gracia del ejercicio está en los casos ambiguos, así que no los esquives: [package.json](https://github.com/novarz/grafana/blob/main/package.json) es a la vez código (dependencias) y entorno (fija `packageManager: yarn@4.17.1` y `engines.node: ">= 22 <25"`); [conf/](https://github.com/novarz/grafana/blob/main/conf/) es configuración versionada que se comporta como estado durable; [docs/](https://github.com/novarz/grafana/blob/main/docs/) es producto para usuarios pero contiene su propio AGENTS.md. Cuando dudes, decide por el criterio "¿quién se rompe si esto cambia?" y escribe una línea justificando la elección.
-
-Hazlo en dos pasadas. En la primera, clasifica sin ayuda del agente, solo mirando nombres y abriendo lo imprescindible. En la segunda, pídele a Cursor que haga la misma clasificación leyendo AGENTS.md primero, y compara. Las discrepancias son el resultado interesante: te dicen dónde el contexto actual del repo no basta para que un agente entienda el sistema, y eso alimentará directamente el capítulo 2 (arquitectura de contexto). Anota también qué carpetas el agente no menciona en absoluto; lo que el contexto no nombra, el agente tiende a tratarlo como si no existiera.
-
-## Capítulo 0 · Evaluación
-
-El entregable es un diagrama de una sola página con cuatro actores: **humano**, **agente**, **CI** y **estado durable**. Las flechas deben describir transiciones reales (el agente lee contexto, edita código, el humano aprueba el push, CI valida, el merge altera el estado) y cada flecha importante debe anclarse en al menos una ruta del repo. Exige un mínimo de cinco paths reales; una buena selección sería AGENTS.md (contrato del agente), `.cursor/reset-demo.sh` (restauración del harness), `.github/CODEOWNERS` (routing de aprobación), `.github/workflows/` (validación) y `kinds/` o `conf/` (estado que sobrevive). El diagrama aprueba si alguien que no conoce Grafana puede responder, solo mirándolo, a dos preguntas: dónde se detiene el agente y quién decide que un cambio entra.
+| Lectura | Alguien que no conoce el producto dice dónde se detiene el agente y quién decide que un cambio entra | Hace falta conocer el repo para entender el dibujo |
+| Flechas | Cada flecha importante nombra un tipo de artefacto (instrucciones, dueños, check, config o schema) | Las flechas dicen «colabora» o «usa IA» |
+| Ancla | Como mucho un path real, si usas el caso Grafana | Una lista de carpetas en el margen |
 
 ## Capítulo 0 · Anti-patrones
 
-El primer anti-patrón es **tratar AGENTS.md como un README de marketing**: leerlo una vez, encontrarlo razonable y no volver a mirarlo. AGENTS.md es un contrato operativo. Cuando dice "Separate PRs for frontend and backend changes" o "Before running `git push`, stop and get explicit human approval", no está sugiriendo estilo, está declarando restricciones del sistema. Un agente que lo ignora no es "creativo", está fuera de especificación. Fíjate además en que el propio fichero tiene dueño en CODEOWNERS (`/AGENTS.md @grafana/docs-tooling`): el contexto agentic se gobierna como cualquier otro artefacto.
+### Leer las instrucciones una vez y archivarlas
 
-El segundo es **ignorar CODEOWNERS y las cadencias FE/BE**. CODEOWNERS no es burocracia: es el mapa de quién responde de cada frontera, y por tanto quién va a revisar lo que el agente produce. Las cadencias distintas de frontend y backend (y de unified storage frente a la capa de API) significan que un cambio "coherente" en un commit puede no serlo en producción. Si tu flujo agentic produce PRs que mezclan squads y cadencias, estás generando trabajo de revisión que nadie puede aprobar limpiamente.
+1. **Qué es** — El fichero de instrucciones del agente es un contrato operativo: puertas, cadencias, comandos. Tratarlo como un manifiesto es leerlo, asentir y no volver a usarlo al abrir un PR.
+2. **Por qué importa** — El agente y el review quedan sin norma común. El PR mezcla squads y el blast radius se discute en comentarios, tarde.
+3. **Best practice** — En cada PR agentic, cita la regla del contrato que el cambio cumple (cadencia, puerta humana, comando). Si no hay regla que citar, el contrato está incompleto.
+4. **Ejercicio mental** — ¿Qué frase del contrato citarías para frenar un push automático?
+
+### Saltarse dueños y cadencias
+
+1. **Qué es** — El mapa de dueños (en muchos repos, un fichero `CODEOWNERS`: quién revisa cada ruta) dice qué persona puede aceptar el cambio. La cadencia dice cuándo llega a producción. Ignorar los dos es tratar el review como un trámite.
+2. **Por qué importa** — Un PR con tres dueños no lo aprueba nadie entero. Un PR que mezcla dos cadencias pide al review que firme un estado que producción no va a tener.
+3. **Best practice** — Si no puedes nombrar un dueño y una cadencia, parte el cambio antes de llamar al agente.
+4. **Ejercicio mental** — ¿Quién aprobaría hoy un cambio que toca a la vez la UI y el servicio que se despliega otro día?
 
 ---
 
-## Capítulo 1 · Objetivos
+## Capítulo 1 — La frontera es un contrato
 
-El capítulo 1 convierte el marco anterior en un mapa operativo. El primer objetivo es definir **fronteras agent-safe**: qué conjunto de ficheros puede tocar un agente en un solo turno sin romper el sistema ni obligar a coordinar varios equipos. El segundo es relacionar cada módulo principal (`pkg/`, `public/app/`, `packages/`, `apps/`, `kinds/`) con su radio de impacto y con su cadena de generación de código, porque en Grafana una parte importante del código no se escribe, se genera, y editar en el lado equivocado de esa cadena es uno de los errores más caros que comete un agente.
+**Objetivos.** Definir una frontera en la que un agente pueda trabajar un turno. Estimar el blast radius sin contar líneas. Decidir cuántos PRs hace falta y si hay algo que regenerar.
 
-## Capítulo 1 · Módulos del monorepo como contratos
+### Una frontera es un contrato
 
-Una frontera es útil para un agente cuando cumple tres condiciones: tiene un lenguaje y un toolchain propios, tiene dueños identificables y tiene una forma de validarse por separado. Con ese criterio, el monorepo de Grafana se descompone así.
+1. **Qué es** — Una frontera es un trozo del repositorio con contrato propio: lenguaje o cadena de herramientas, dueños identificables, y una forma de validarse sin arrastrar el resto. Una frontera segura para un agente cabe en un turno: se edita dentro, los tests de esa frontera responden, y un solo grupo puede revisar.
+2. **Por qué importa** — Si el turno cruza el contrato, el PR junta revisores y el blast radius deja de ser el que el autor creía. El agente puede editar ambos lados con el mismo esfuerzo; el review no puede aprobarlos con el mismo criterio.
+3. **Best practice** — Antes de editar, escribe la frontera en una frase: qué entra, qué queda fuera, quién revisa, qué comando la valida. Si la frase no sale, el cambio todavía no es un turno.
+4. **Ejemplo (Grafana, opcional)** — Un cambio de presentación que se queda en [`public/app/features/dashboard/`](https://github.com/novarz/grafana/tree/main/public/app/features/dashboard) se valida con los tests de esa feature. Esa carpeta es la frontera del turno.
+5. **Ejercicio mental** — El último cambio que describiste como «el botón y la API». ¿Son dos fronteras con dueños distintos?
 
-| Frontera | Rol | Toolchain | Radio de impacto |
-| --- | --- | --- | --- |
-| `pkg/` | Backend Go | Go, Wire, Make | Servidor completo |
-| `public/app/` | Frontend | TS/React, Jest | La UI de Grafana |
-| `packages/` | Librerías compartidas | Yarn workspaces, Nx | Grafana y plugins externos |
-| `apps/` | Apps del App SDK | Go, CUE, App SDK | Un recurso y su API |
-| `kinds/` | Schemas CUE | CUE, `make gen-cue` | Go y TS generados |
+### El blast radius es quién se rompe
 
-[pkg/](https://github.com/novarz/grafana/blob/main/pkg/) es el backend Go. AGENTS.md lo describe con su tabla interna (`pkg/api/` para handlers, `pkg/services/` para lógica de negocio por dominio, `pkg/server/` para la inicialización y Wire, `pkg/storage/`, `pkg/plugins/`…) y con una regla de diseño clara: "business logic in `pkg/services/<domain>/` not in API handlers". Para un agente esto define una frontera interna: un cambio de comportamiento de negocio debería vivir en `pkg/services/<dominio>/` y no extenderse a `pkg/api/` salvo que cambie el contrato HTTP. Y añade una trampa de codegen: si cambias la inicialización de servicios, hay que ejecutar `make gen-go` para regenerar Wire.
+1. **Qué es** — El blast radius es el conjunto de personas, sistemas y versiones que se rompen si el cambio va mal o si solo se despliega una parte. Se cuenta en consumidores, no en líneas. Una pantalla que solo usa tu equipo tiene radio chico. El mismo componente, si lo consumen otros equipos o gente fuera del repo, tiene radio grande.
+2. **Por qué importa** — El agente optimiza el diff que ve. Quien no está en el diff —el servicio que sale la semana que viene, el paquete de terceros, el fichero que el próximo build regenera— solo entra en el review si alguien lo nombra. Un radio grande pide más de un revisor y, a menudo, más de un PR.
+3. **Best practice** — En la descripción del cambio, una línea obligatoria: «si esto falla, se rompe X y no se rompe Y». Si X incluye consumidores fuera del repo, es un cambio de API.
+4. **Ejemplo (Grafana, opcional)** — [`packages/grafana-ui`](https://github.com/novarz/grafana/tree/main/packages/grafana-ui) lo usa la aplicación y también plugins de terceros. Cambiar ahí una firma cambia un contrato, aunque el monorepo siga compilando.
+5. **Ejercicio mental** — Cambias el redondeo de un helper de fechas en una librería compartida y los tests del producto siguen en verde. ¿Quién se entera?
 
-[public/app/](https://github.com/novarz/grafana/blob/main/public/app/) es el frontend: `core/` para servicios compartidos, `features/` para código por dominio, `plugins/` para plugins integrados y `store/` para Redux. La frontera agent-safe más natural del repo es un subdirectorio de `public/app/features/`, porque suele tener un único squad dueño. Por ejemplo, CODEOWNERS asigna `/public/app/features/dashboard/` y `/public/app/features/dashboard-scene/` a `@grafana/dashboards-squad`, aunque con excepciones finas (el `TransformationsEditor` es de `@grafana/datapro`, `ShareModal` de `@grafana/sharing-squad`). Incluso dentro de una "feature" hay sub-fronteras de ownership; el agente debería saber en cuál está.
+### Un PR por cadencia de despliegue
 
-[packages/](https://github.com/novarz/grafana/blob/main/packages/) es donde viven las librerías `@grafana/*`: `grafana-data`, `grafana-ui`, `grafana-runtime`, `grafana-schema`, `grafana-e2e-selectors`, `grafana-i18n` y otras. Aquí el radio de impacto cambia de naturaleza: estos paquetes no solo los consume `public/app/`, también los consumen plugins de terceros. Son la **API interna entre equipos** y, en parte, una API pública.
+1. **Qué es** — La cadencia es el ritmo al que una parte llega a producción. Dos carpetas del mismo commit pueden desplegarse en días distintos. En esa ventana, la versión nueva de un lado convive con la versión vieja del otro, así que cada lado tiene que seguir entendiendo al otro.
+2. **Por qué importa** — Un PR «completo» esconde la ventana. Los tests locales corren las dos mitades juntas, que es justo el estado que producción no tiene. El agente no ve el fallo; el review firma un estado ficticio.
+3. **Best practice** — Si dos partes no salen a la vez, van en PRs distintos. El primero en desplegarse no puede exigir que el segundo ya esté fuera. Cada lado tolera la versión anterior del otro.
+4. **Ejemplo (Grafana, opcional)** — El contrato raíz pide PRs distintos para frontend y backend porque se despliegan con cadencias distintas. [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md)
+5. **Ejercicio mental** — Tu API sale los martes y la web los jueves. El martes, ¿qué hace el cliente viejo contra la API nueva?
 
-[apps/](https://github.com/novarz/grafana/blob/main/apps/) contiene apps autónomas del App SDK: `advisor`, `alerting`, `annotation`, `dashboard`, `folder`, `iam`, `playlist`, `provisioning`, `secret`, `shorturl` y más. Cada una es un módulo Go propio con sus schemas CUE. Y [kinds/](https://github.com/novarz/grafana/blob/main/kinds/) contiene los schemas CUE de dashboard y panel, junto a [kinds/gen.go](https://github.com/novarz/grafana/blob/main/kinds/gen.go); según AGENTS.md, "Dashboard/panel schemas in `kinds/` generate both Go and TS code via `make gen-cue`". Es la frontera con mayor radio de impacto relativo a su tamaño: unas pocas líneas de CUE se propagan a Go, a TypeScript y a `@grafana/schema`.
+### Se cambia la fuente y se regenera
 
-### Workspaces duales: go.work frente a Yarn y Nx
+1. **Qué es** — Un artefacto generado es un fichero que un comando escribe a partir de una fuente. La fuente es el contrato. El fichero generado es una salida versionada. Editar la salida a mano produce un diff que el siguiente comando deshace o deja a medias.
+2. **Por qué importa** — El review ve un tipo «arreglado» y lo aprueba. La siguiente generación vuelve a la fuente vieja y el arreglo desaparece, o fuente y salida divergen y el próximo agente repara el lado equivocado. El blast radius incluye todo lo que cuelga de esa cadena, a veces en más de un lenguaje.
+3. **Best practice** — Si un comando documentado reescribe el fichero, el cambio va en la fuente, se regenera con ese comando, y el PR trae fuente y salida y nombra el comando.
+4. **Ejemplo (Grafana, opcional)** — Los schemas de dashboard y panel viven en [`kinds/`](https://github.com/novarz/grafana/tree/main/kinds). `make gen-cue` escribe a partir de ellos el código del backend y del frontend. CUE es un lenguaje para describir schemas; Go es el lenguaje del backend y TypeScript el del frontend. Un arreglo a mano en la salida no sobrevive a la siguiente corrida.
+5. **Ejercicio mental** — El diff del agente solo toca la salida. ¿Dónde está la fuente y qué comando la vuelve a escribir?
 
-El monorepo tiene dos sistemas de workspaces que no se conocen entre sí, y entender ambos es entender qué es "un módulo" para cada toolchain. En el lado Go, [go.work](https://github.com/novarz/grafana/blob/main/go.work) declara `go 1.26.6` y una lista `use (...)` con el módulo raíz (`.`), cada app de `apps/` (incluidas cuatro sub-apps de alerting: `alertenrichment`, `alertrulequality`, `notifications`, `rules`) y varios módulos de `pkg/` que se versionan por separado, como `pkg/apimachinery`, `pkg/apiserver`, `pkg/plugins`, `pkg/codegen` o `pkg/storage/unified/resourcepb`. Cada entrada es una frontera de compilación y de dependencias: un agente que añade un módulo Go nuevo debe ejecutar `make update-workspace`, tal como recuerda AGENTS.md.
+### El tamaño se cuenta en fronteras
 
-En el lado JavaScript, [package.json](https://github.com/novarz/grafana/blob/main/package.json) declara los workspaces `packages/*`, `public/app/plugins/*/*` y `e2e-playwright/test-plugins/*`, y [nx.json](https://github.com/novarz/grafana/blob/main/nx.json) añade caché para los targets `build` (con salidas en `{projectRoot}/dist`) y `generate`, con `defaultBase: "main"`. Esa última línea importa: Nx calcula qué proyectos están "afectados" comparando con `main`, lo cual da al agente una forma sancionada de preguntar "¿qué toca mi cambio?" en vez de adivinarlo. Hay además plugins integrados que necesitan build propio (`azuremonitor`, `loki`, `grafana-testdata-datasource`), un recordatorio de que "frontend" no es un bloque único.
+1. **Qué es** — Para un agente, el tamaño de un cambio es el número de fronteras que cruza. Diez líneas dentro de una frontera caben en un turno. Diez líneas que cruzan dos cadenas de herramientas, dos cadencias y dos dueños son un proyecto.
+2. **Por qué importa** — «Terminar la feature» en un solo diff junta radios de impacto que el review no puede firmar juntos. Partir por frontera deja cada PR con tests, dueño y cadencia propios.
+3. **Best practice** — Si cuentas dos fronteras, escribe dos planes antes de editar. Uno de los dos puede ser «este turno no lo toco».
+4. **Ejercicio mental** — Coge el último ticket que parecía «un rato». Cuenta fronteras, no líneas. ¿Sigue siendo un rato?
 
-La consecuencia arquitectónica es que la pregunta "¿esto es un cambio pequeño?" no tiene respuesta en líneas de código, sino en cuántos workspaces cruza. Un cambio que vive en un solo workspace se puede compilar, testear y revisar por separado. Uno que cruza `go.work` y Yarn a la vez ya es un cambio FE+BE, y AGENTS.md pide separarlos en PRs distintos.
+## Capítulo 1 · Laboratorio
 
-### Apps SDK frente a pkg/services
+Bug ficticio, a propósito ambiguo: «cambiar cómo se muestra el título de un panel». Escribe dos planes, sin abrir el repo.
 
-Grafana conserva dos formas de construir backend, y un agente necesita saber cuál está tocando. La tradicional es `pkg/services/<dominio>/`: servicios Go inyectados con Wire, consumidos por handlers de `pkg/api/` y persistidos vía `sqlstore`. La nueva es `apps/<nombre>/`: módulos autocontenidos que definen sus recursos en CUE y se registran mediante el App SDK. Que convivan no es desorden, es una migración en curso, y la documentación lo explica con mucho detalle.
+**Solo presentación.** El título ya existe en el modelo guardado. El plan nombra una frontera, un dueño, los tests de esa frontera y un solo PR.
 
-La lectura guiada del capítulo es [contribute/architecture/k8s-inspired-backend-arch.md](https://github.com/novarz/grafana/blob/main/contribute/architecture/k8s-inspired-backend-arch.md). Su tesis: Grafana adopta un modelo orientado a recursos al estilo Kubernetes, con Resource APIs bajo `/apis/<group>/<version>/namespaces/<namespace>/<resource>/<name>`, y "the end goal is for the Resource APIs to become the only interface for managing core Grafana resources". Distingue dos enfoques de implementación. El *Registry Approach* (`pkg/registry/apis/...`) es el original, en Go. El *Apps Approach* (`apps/...`) es "the direction Grafana is moving towards for all resources": cada app define recursos en `kinds/*.cue` y los registra vía App SDK. El ejemplo canónico es la app de playlist: `apps/playlist/kinds/playlist.cue` define el schema, `pkg/apis/playlist/v1/` contiene los tipos Go generados, un reconciler actúa sobre los recursos y `pkg/registry/apps/playlist/register.go` registra el kind.
+**Cambio de modelo.** Hace falta un campo nuevo o un significado nuevo en lo que se persiste. El plan ordena: fuente del schema, comando que regenera, consumidores, qué ficheros son salida generada, y qué va en el PR que se despliega primero.
 
-Para nuestro propósito, la parte más importante es la separación entre la **capa de API** y **unified storage**. El documento define unified storage (`pkg/storage/unified/...`) como "Grafana's internal persistence layer backing the Resource API", que "decouples API handlers from the storage backend", implementa la `storage.Interface` de Kubernetes sobre SQL (PostgreSQL, MySQL, SQLite, no etcd) y usa `resourceVersion` para concurrencia optimista: si la versión almacenada difiere, la actualización se rechaza con un 409. También describe la migración por recurso en nueve pasos, con feature flags (por ejemplo `kubernetesClient<Resource>`) y versiones alpha, beta y GA. Si juntas esto con la advertencia de AGENTS.md sobre cadencias de despliegue distintas, el resultado es una frontera dura: cualquier cambio que toque a la vez callers de la capa de API y `pkg/storage/unified/` es, por definición, un cambio de compatibilidad, y debe leerse [pkg/storage/unified/AGENTS.md](https://github.com/novarz/grafana/blob/main/pkg/storage/unified/AGENTS.md) antes de escribir una línea.
+Tercera pregunta, para los dos planes: ¿quién consume esto además del equipo que lo escribe, y qué se rompe fuera de ese equipo?
 
-> **Regla práctica.** Si el cambio cruza la línea API ↔ unified storage, deja de ser un cambio "de un turno". Necesita plan de compatibilidad en ambas direcciones y una revisión de quien es dueño de esa capa.
+Si quieres el ancla de Grafana, reutiliza el ejemplo de [`kinds/`](https://github.com/novarz/grafana/tree/main/kinds) del principio anterior: el campo nuevo empieza en la fuente y se regenera; la presentación sola no entra ahí.
 
-### Paquetes compartidos como API interna
+## Capítulo 1 · Rúbrica
 
-Los paquetes `@grafana/data` (estructuras de datos), `@grafana/ui` (componentes), `@grafana/runtime` (servicios en ejecución) y `@grafana/schema` (tipos generados desde CUE) son la frontera más engañosa para un agente, porque parecen código de la casa y se comportan como una API pública. Un cambio de firma en un componente de `@grafana/ui` puede compilar perfectamente dentro del monorepo y aun así romper plugins externos que dependen de la versión publicada. Por eso el capítulo 5 hablará del workflow de detección de breaking changes; aquí basta con interiorizar que tocar `packages/` es cambiar un contrato.
+Entregable: una matriz. Una fila por cambio. Columnas: frontera, blast radius (quién se rompe), tests mínimos, dueños, número de PRs, comando de generación o «no aplica».
 
-El ownership confirma esa lectura. CODEOWNERS asigna `/packages/grafana-ui/` a `@grafana/grafana-frontend-platform`, pero componentes concretos como `BarGauge`, `DataLinks` o `RadialGauge` son de `@grafana/dataviz-squad`. `@grafana/data` está repartido por subcarpetas entre más de media docena de squads (`src/panel/` y `src/field/` de `@grafana/dashboards-squad`, `src/transformations/` de `@grafana/datapro`, `src/rbac/` de `@grafana/access-squad`…). Y `/packages/grafana-schema/` es de `@grafana/grafana-app-platform-squad`, con la parte de dashboard delegada a `@grafana/dashboards-squad`. Un paquete compartido es, literalmente, un sitio donde varios equipos firman el mismo contrato.
+Mínimo: las dos filas del laboratorio, más una fila que cruce dos cadencias.
 
-`@grafana/schema` merece mención aparte porque es la desembocadura de la cadena `kinds/ → make gen-cue → packages/grafana-schema`. Sus tipos no se escriben a mano. Un agente que "arregla" un tipo directamente ahí está editando un artefacto generado que el siguiente `make gen-cue` sobrescribirá, y probablemente rompiendo la coherencia entre el schema y lo que valida el backend.
-
-## Capítulo 1 · Laboratorio: el título del panel
-
-Plantéate un bug ficticio: "cambiar cómo se muestra o se edita el título de un panel". Es deliberadamente ambiguo, porque la misma frase describe cambios con radios de impacto muy distintos. Tu trabajo es trazar dos versiones del cambio y listar los ficheros y comandos que tocaría cada una.
-
-En la **versión FE-only**, el título ya existe en el modelo (el schema de dashboard en [kinds/dashboard/dashboard_kind.cue](https://github.com/novarz/grafana/blob/main/kinds/dashboard/dashboard_kind.cue) define un campo `title?: string` para paneles) y solo cambia la presentación o la edición. El cambio vive en `public/app/features/dashboard-scene/` o `public/app/features/dashboard/`, tiene un único squad dueño, se valida con tests Jest del área (aplicando la skill `frontend-testing-strategy`, como pide AGENTS.md) y es un buen candidato para un único turno de agente. Identifica los componentes concretos que tocarías y qué tests mínimos añadirías.
-
-En la **versión schema change**, el cambio exige un campo nuevo o un cambio de semántica del título en el modelo persistido. Ahora la traza empieza en `kinds/`, pasa por `make gen-cue`, regenera tipos en Go y en `packages/grafana-schema`, probablemente afecta a la app de dashboard en [apps/dashboard/](https://github.com/novarz/grafana/blob/main/apps/dashboard/) (de `@grafana/grafana-app-platform-squad` y `@grafana/dashboards-squad`) y solo al final llega a la UI. Escribe el orden exacto de ficheros y comandos, marca cuáles son generados y cuáles escritos a mano, y separa lo que irá en un PR de backend y lo que irá en uno de frontend.
-
-Como segunda parte, compara dos cambios aparentemente parecidos: modificar un componente de `packages/grafana-ui` (por ejemplo, el comportamiento de un input que se usa para títulos) frente a modificar directamente el editor de paneles en `public/app/features/dashboard`. Para cada uno, responde a tres preguntas: quién lo consume además de Grafana, qué squad lo revisa según CODEOWNERS y qué podría romperse fuera del repo. La diferencia que deberías encontrar es que el primero cambia un contrato con consumidores externos y el segundo cambia una implementación con un solo consumidor.
-
-## Capítulo 1 · Evaluación
-
-El entregable es una matriz con una fila por cambio y cuatro columnas: frontera cruzada, tests mínimos, owners según CODEOWNERS y codegen requerido. Debe cubrir al menos los dos casos del laboratorio y añadir tres más de tu elección, uno de los cuales debe cruzar la línea API ↔ unified storage.
-
-| Cambio | Frontera | Tests mínimos | Owners |
-| --- | --- | --- | --- |
-| Título de panel, solo UI | `public/app/features/dashboard-scene/` | Jest del área | `@grafana/dashboards-squad` |
-| Campo nuevo en schema | `kinds/` → `apps/dashboard/` → UI | Go + Jest, en PRs separados | App platform + dashboards |
-| Componente en grafana-ui | `packages/grafana-ui/` | Jest + revisión de API | `@grafana/grafana-frontend-platform` |
-
-*Las tres filas son el arranque; complétalas con codegen requerido y añade tus propios casos.*
-
-La matriz aprueba si cada fila permite a un agente decidir, sin preguntar, si el cambio cabe en un turno, cuántos PRs necesita y a quién va a llegar la revisión. Una fila que dice "tests: los necesarios" o "owners: el equipo" no aprueba.
+| | Aprueba | No aprueba |
+| --- | --- | --- |
+| Decisión | Un agente, leyendo la fila, sabe si cabe en un turno, cuántos PRs abre y a quién le llega el review | «Tests: los necesarios», «dueños: el equipo» |
+| Radio | La columna de blast radius nombra consumidores, incluidos los de fuera del repo cuando existan | La columna repite el número de líneas o de ficheros |
+| Generación | La fila dice la fuente y el comando, o dice explícitamente que no hay nada generado | El diff toca una salida y la fila no lo marca |
 
 ## Capítulo 1 · Anti-patrones
 
-El primer anti-patrón es el **PR "full stack"** cuando AGENTS.md pide explícitamente separar frontend y backend porque se despliegan con cadencias distintas. Es tentador, porque al agente le cuesta lo mismo editar un fichero Go que uno TSX, y el resultado parece más completo. Pero ese PR mezcla revisores, mezcla pipelines de CI y crea una ventana en la que el backend nuevo convive con el frontend viejo (o al revés) sin que nadie haya pensado en ello. La separación no es una molestia de proceso: es la forma que tiene el sistema de hacer explícita la compatibilidad.
+### Un solo PR para dos cadencias
 
-El segundo es **editar artefactos generados a mano**. En Grafana hay al menos cinco cadenas de generación documentadas en AGENTS.md: Wire (`make gen-go`), CUE (`make gen-cue`), App SDK (`make gen-apps`), OpenAPI (`make swagger-gen`) y feature toggles (`make gen-feature-toggles`). Cada una tiene una fuente de verdad y unos ficheros de salida. Un agente que corrige un tipo en `packages/grafana-schema` o en `wire_gen.go` produce un diff que parece correcto, pasa la revisión superficial y desaparece (o se corrompe) en la siguiente regeneración. La regla es simple: si un fichero es generado, el cambio se hace en su fuente y se regenera con el comando sancionado.
+1. **Qué es** — El agente edita los dos lados en un turno y abre un PR «full stack» porque el diff parece una feature cerrada.
+2. **Por qué importa** — Mezcla revisores, mezcla checks y crea la ventana en la que un lado nuevo convive con el otro viejo sin que nadie la haya diseñado.
+3. **Best practice** — Parte por cadencia en el plan, antes de la primera edición. El PR que sale primero tiene que funcionar con el lado que todavía no ha cambiado.
+4. **Ejercicio mental** — Si el backend mergea el lunes y el frontend el jueves, ¿qué comportamiento ves el martes?
+
+### Editar la salida a mano
+
+1. **Qué es** — El agente «arregla» un tipo en un fichero generado porque es el fichero que el compilador señaló.
+2. **Por qué importa** — El diff parece correcto, pasa un review superficial y desaparece o se corrompe en la siguiente generación. El turno siguiente repara otra vez la salida.
+3. **Best practice** — Ante un error en un fichero generado, el arreglo se escribe en la fuente y se regenera con el comando que ya documenta el repo.
+4. **Ejercicio mental** — ¿Qué comentario o qué comando te haría soltar el fichero que tienes abierto y buscar la fuente?
 
 ## Lo que viene
 
-Con el marco del capítulo 0 y el mapa de fronteras del capítulo 1, el capítulo 2 entra en la arquitectura de contexto: cómo se escriben y se escalonan los AGENTS.md (raíz, por directorio, skills) para que un agente cargue exactamente las restricciones de la frontera en la que está trabajando, ni más ni menos. Guarda el inventario y la matriz que has producido aquí: son la materia prima del siguiente laboratorio.
+El capítulo 2 apila el contexto para que el agente cargue el contrato de la frontera en la que está: raíz, fichero de la zona, procedimiento invocable, guía humana por enlace. La matriz de este capítulo es la entrada de ese laboratorio.
