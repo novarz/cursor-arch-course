@@ -84,24 +84,24 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 ## Capítulo 3 — Agent topology: skills, scripts, humanos y especialización
 
 **Objetivos**
-- Modelar topologías: agente generalista + skills + human-in-the-loop + reset harness.
-- Definir cuándo invocar skill vs leer AGENTS vs pedir aprobación humana.
+- Modelar el turno como reparto: agente generalista, skill, humano y harness con restore point.
+- Decidir cuándo abrir una skill, cuándo basta la raíz o la zona, y cuándo parar para una persona.
 
 **Deep-dive**
-- `.cursor/skills/*/SKILL.md`: reset-demo, frontend-testing-strategy, panel-testing-strategy, add-e2e-selectors.
-- Cascada de skills (panel → frontend-testing).
-- Presenter topology: `.cursor/101-SCRIPT.md` + restricciones “no arrancar webpack desde agent terminal”.
-- Human Review Gates antes de `git push` / PR.
+- Cuatro papeles. Regla permanente frente a skill con disparador frente a puerta humana.
+- Una skill llama a otra (panel → frontend-testing → selectores); no copia el procedimiento.
+- Quien presenta arranca el producto. El agente no. El restore point es un pin con nombre (`demo/start`), y el script solo mueve el git.
+- Push, force-push, merge y un webhook no van en el paso por defecto de una skill.
 
 **Lab**
-- Simular un flujo 201: agente implementa en branch demo; humano arranca Grafana; skill reset-demo restaura pin.
-- Diseñar una skill nueva “go-migration-check” (solo especificación SKILL.md, sin merge al repo).
+- Simular el flujo: pin anotado, agente en rama de ensayo sin push, la persona arranca la app, `reset-demo` vuelve al pin.
+- Especificar una skill nueva «go-migration-check» (solo `SKILL.md`, sin merge). Texto: `capitulos/03-topologia-agentes.md`.
 
 **Evaluación**
-- Diagrama de secuencia: usuario → agente root → skill → shell → CI → humano.
+- Diagrama de secuencia: usuario → agente → skill → shell → CI → humano, con la parada antes del push. Rúbrica de la skill.
 
 **Anti-patrones**
-- Agente monolítico sin skills; skills que ejecutan side-effects irreversibles sin confirmación; olvidar el restore point `demo/start`.
+- Agente monolítico sin skills. Skill que publica o force-pushea sin parada. Restaurar a la punta de `main` en vez del pin `demo/start`.
 
 ---
 

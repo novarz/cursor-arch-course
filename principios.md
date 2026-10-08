@@ -96,8 +96,32 @@ Se leen sin Grafana. En los capítulos, cada uno se despliega igual: **principio
 
 **Por qué.** Un atajo de demo en la rama real, o una regla de producto tratada como ensayo, cambian el blast radius sin que el review lo vea.
 
-**Práctica.** En las instrucciones, marcar qué es ensayo y qué es sistema, y dejar escrito el comando de restauración.
+**Práctica.** En las instrucciones, marcar qué es ensayo y qué es sistema. El punto de restauración es un pin con nombre y un comando. Mover el pin lo hace una persona.
+
+### 13. Un turno tiene cuatro papeles
+
+**Qué.** Agente generalista (edita dentro de la frontera), skill (procedimiento con disparador), humano (puertas y procesos que no arranca el agente), harness (vuelve a un pin conocido).
+
+**Por qué.** Un solo agente que hace de los cuatro elige el procedimiento, publica y deja el repo sin forma de volver.
+
+**Práctica.** Una línea antes del turno: quién edita, qué skill si aplica, qué espera a la persona, cuál es el pin.
+
+### 14. Regla, skill o persona
+
+**Qué.** La regla vale en cada edición de su ámbito. La skill se abre cuando la tarea coincide con el disparador. La persona entra si el paso publica, mergea, force-pushea o dispara otro sistema.
+
+**Por qué.** Meter el procedimiento en la raíz lo carga siempre. Meter la puerta dentro de la skill hace que un disparador publique. Pedir aprobación para cada test esconde la puerta de verdad.
+
+**Práctica.** Tres preguntas: ¿vale en cada edición? ¿es un cómo con disparador? ¿publica, mergea o dispara otro sistema? Regla, skill, persona.
+
+### 15. Una skill llama; no copia
+
+**Qué.** La skill especializada manda a leer la general y solo escribe lo suyo. La general dice en qué caso hace falta la especializada.
+
+**Por qué.** Dos copias del mismo procedimiento: el review exige una y el agente obedece la otra.
+
+**Práctica.** Si la skill nueva repite más de un paso de otra, ese paso es un enlace.
 
 ---
 
-**En voz alta, sin nombrar un producto.** Una frontera es un contrato: cadena de herramientas, dueños y validación propia; un turno de agente cabe en una. El blast radius es quién se rompe si el cambio va mal o llega solo a medias. El contexto se apila: contrato del repo, reglas de la zona cuando el glob coincide, un procedimiento solo si la tarea lo pide, y la guía humana por un enlace.
+**En voz alta, sin nombrar un producto.** Una frontera es un contrato: cadena de herramientas, dueños y validación propia; un turno de agente cabe en una. El blast radius es quién se rompe si el cambio va mal o llega solo a medias. El contexto se apila: contrato del repo, reglas de la zona cuando el glob coincide, un procedimiento solo si la tarea lo pide, y la guía humana por un enlace. Una skill se abre cuando la tarea coincide con su disparador; una regla vale en cada edición de su zona; publicar o un efecto difícil de deshacer espera a una persona. El restore point es el pin al que el harness vuelve, no la punta de la rama de trabajo.
