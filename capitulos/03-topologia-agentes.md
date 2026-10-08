@@ -1,146 +1,193 @@
-# Capítulo 3 — Topología: quién hace qué en un turno
+# Capítulo 3 — Topología: qué pieza para cada necesidad
 
-Este capítulo se lee sin conocer Grafana. Al terminar tienes que poder explicar en voz alta tres cosas: cuándo se abre una skill, cuándo se para para una persona, y para qué sirve un punto de restauración (restore point). Grafana es un ejemplo por principio. Las rutas de apoyo siguen en [example-map.md](../example-map.md).
+Este capítulo se lee sin conocer un producto concreto. Al terminar tienes que poder explicar en voz alta qué es cada pieza, cuándo usarla y cómo dibujar la topología de tu repo.
+
+El capítulo 2 dice qué contexto cargar: raíz, zona, procedimiento, guía por enlace. Este dice qué mecanismo usar para cada necesidad y cómo se componen. Una zona bien escrita en la pieza equivocada sigue sin cumplirse.
 
 Cada idea usa el mismo bloque: **qué es → por qué importa → best practice → ejemplo corto → ejercicio mental**.
 
-Hace falta el capítulo 2. Allí una regla de zona vale en cada edición de esa carpeta, y una skill es un procedimiento con disparador. Aquí se decide cuál de las dos toca, y cuándo no toca ninguna: toca una persona.
+*Documentación consultada el 8 oct 2026. Enlaces al final.*
 
-*Hechos de Grafana comprobados en `main` de novarz/grafana el 8 oct 2026 (commit `142e558`).*
+**Objetivos.** Nombrar las piezas de un turno (agente, reglas, skills, herramientas, subagentes, hooks, persona). Decidir cuál toca con un árbol. Dibujar una topología simple y otra compuesta.
 
-**Objetivos.** Dibujar el reparto de un turno: agente generalista, skills, humano y harness. Decidir entre skill, fichero de instrucciones y aprobación humana. Encadenar skills sin copiarlas. Parar antes de un efecto difícil de deshacer.
+### El agente es un bucle con herramientas
 
-### Un turno tiene cuatro papeles
+1. **Qué es** — Un agente (agent) es un modelo que dirige su propio proceso: planifica, llama herramientas, mira el resultado y vuelve a decidir. Anthropic separa eso de un workflow: en un workflow el camino está escrito de antemano (un paso, luego otro, con una comprobación en medio). En un agente el modelo elige el camino. El bucle termina cuando la tarea acaba, cuando aparece un bloqueo, o cuando se cumple una condición de parada. En Cursor ese bucle es el modo Agent: lee, edita y ejecuta. El modo Plan investiga y escribe un plan que tú revisas antes de construir. El modo Ask solo lee. El modo Debug parte de hipótesis y de lo que el programa hace al ejecutarse.
+2. **Por qué importa** — Si crees que el agente sigue un guion fijo, escribes la política como una frase y das por hecho que ocurrirá. El bucle puede saltarse la frase, repetir un paso o parar pronto. El coste de ese margen es latencia y errores que se acumulan. Por eso se empieza por el bucle simple y se añade una pieza solo cuando un fallo se repite.
+3. **Best practice** — Antes de diseñar la topología, di si el camino es fijo o abierto. Camino fijo: un workflow (un script, un check, una cadena corta). Camino abierto: un agente, con pocas herramientas bien descritas. El plan de Anthropic cabe en tres líneas: diseño simple, pasos visibles, herramientas que un compañero nuevo entendería.
+4. **Ejemplo** — «Añade el campo `refund_reason` al servicio de pagos» tiene un número de pasos abierto: hay que encontrar el modelo, la API y los tests. Es un agente. «Formatea este fichero con el comando del repo» es un camino fijo.
+5. **Ejercicio mental** — Tu última tarea, ¿tenía los pasos escritos antes de empezar, o el número de pasos dependía de lo que el agente fuera encontrando?
 
-1. **Qué es** — La topología es el reparto de un turno. Hay cuatro papeles. El **agente generalista** lee el contrato del repo y edita dentro de la frontera del capítulo 1. Una **skill** es un procedimiento con disparador: se abre cuando la tarea coincide, y se cierra al terminar. El **humano** ocupa las puertas: aprueba lo que no se deshace con otro edit, y arranca lo que no pertenece a la terminal del agente. El **harness** es el entorno de ensayo: estado conocido y un restore point para volver a él. El ensayo no es el producto; el reparto sí viaja.
-2. **Por qué importa** — Un solo agente que hace de los cuatro elige el procedimiento, publica y deja el repo sin forma de volver. El blast radius (quién se rompe si el cambio va mal) pasa a ser «lo que el modelo decidió en este chat». El review no tiene un papel al que señalar.
-3. **Best practice** — Antes del turno, una línea: quién edita, qué skill si la tarea lo pide, qué espera a la persona, cuál es el restore point. Un papel en blanco se dice en voz alta. «El agente ya se apañará» no es un papel.
-4. **Ejemplo (Grafana, opcional)** — El contrato raíz declara agentes de zona por directorio y, al lado, skills que se abren por tarea. El agente de la raíz no se traga esos procedimientos en cada edición. [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md)
-5. **Ejercicio mental** — En el último turno que aceptaste, ¿qué papel hiciste tú y cuál estaba escrito en el repo?
+### Una regla es verdad dentro de un ámbito
 
-### Regla, skill o persona
+1. **Qué es** — Una regla (rule) es texto que entra en el contexto del agente. En Cursor hay cuatro formas de engancharla, según tres campos del fichero `.mdc`: `alwaysApply`, `description` y `globs`. Un glob es un patrón de rutas, por ejemplo `services/payments/**`. Siempre (`alwaysApply: true`): entra en cada chat; los otros campos se ignoran. Auto-enganchada: `alwaysApply: false` y un glob; entra cuando hay un fichero que coincide. A petición del agente: `alwaysApply: false`, con `description` y sin globs; el agente lee la description y tira de la regla si le parece relevante. Manual: sin description y sin globs; entra solo si la mencionas con `@`. Un `.md` suelto dentro de `.cursor/rules` no cuenta: falta el frontmatter. Para markdown plano está `AGENTS.md`.
+2. **Por qué importa** — El capítulo 2 llamó zona al fichero que se enciende en una parte del repo. Aquí el producto tiene dos maneras de hacerlo. Un `AGENTS.md` anidado es markdown sin campos obligatorios: al trabajar en esa carpeta, Cursor lo combina con los de las carpetas padre y la instrucción más específica tiene prioridad. El formato abierto [agents.md](https://agents.md/) no exige campos: manda el fichero más cercano al archivo editado, y el mensaje de la persona manda sobre el fichero. La regla con glob afina más: por tipo de fichero, no solo por carpeta. Una regla «a petición del agente» puede no cargarse, porque entra solo si el modelo juzga la description relevante. La skill `/migrate-to-skills` convierte justo esas reglas —sin glob, y con `alwaysApply` en falso o ausente— en skills.
+3. **Best practice** — Lo que es verdad en cada edición de un ámbito va en una regla siempre-activa o en una regla con glob, o en el `AGENTS.md` de esa carpeta. Menos de 500 líneas, un tema por fichero, un enlace al ejemplo canónico en vez de pegar la guía. Las reglas de equipo, si existen, se mezclan con las del repo y ganan si chocan. Las reglas no afectan al autocompletado Tab ni al edit inline: solo al agente.
+4. **Ejemplo** — En `web/`, los componentes exportan por nombre. Eso es una regla con glob `web/**/*.tsx`, o un `AGENTS.md` dentro de `web/`. No es una skill: no hay disparador, es verdad en cada edición de esos ficheros.
+5. **Ejercicio mental** — Una norma de columnas `snake_case` en la base de datos. ¿Entra en cada edición de `db/`, o solo cuando alguien escribe una migración? La respuesta elige regla o skill.
 
-1. **Qué es** — Tres sitios distintos, y solo uno encaja. Una **regla** (raíz o zona) se cumple en cada edición de su ámbito: «en esta carpeta no hagas Y». Una **skill** responde a un disparador: «cuando hagas X, sigue estos pasos». Una **persona** entra cuando el paso publica o cambia algo fuera del diff (un side-effect: un efecto que no se deshace editando otra línea). El capítulo 2 separó regla y skill. La persona es el tercer sitio.
-2. **Por qué importa** — El procedimiento metido en la raíz se carga en turnos que no lo necesitan y envejece lejos de quien lo mantiene. La puerta metida dentro de la skill hace que un disparador publique solo. Pedir aprobación para cada test para el turno, y el equipo acaba saltándose la puerta de verdad.
-3. **Best practice** — Tres preguntas, en orden. ¿Vale en cada edición de esta carpeta? Es regla. ¿Es un cómo, y solo cuando la tarea aparece? Es skill. ¿Publica, mergea, force-pushea o dispara otro sistema? Es persona. Si dudas entre las dos primeras, es skill: una regla que no aplica en cada edición estorba.
-4. **Ejemplo (Grafana, opcional)** — El guion del presentador lo dice en una línea: la regla dice qué hay que cumplir; la skill dice cómo. [`.cursor/101-SCRIPT.md`](https://github.com/novarz/grafana/blob/main/.cursor/101-SCRIPT.md)
-5. **Ejercicio mental** — Una norma de cada edición en la carpeta, un procedimiento al escribir una migración, y un push. ¿Cuál es regla, cuál skill, cuál persona?
+### Una skill es un procedimiento que se abre por capas
 
-### Una skill llama a otra; no la copia
+1. **Qué es** — Una skill es un paquete versionado que enseña un procedimiento. Vive en una carpeta con un `SKILL.md`: campos `name` y `description` obligatorios, y un cuerpo en markdown. La description dice qué hace y cuándo usarla. Cursor la descubre al arrancar y el agente decide si es relevante. También puedes invocarla con `/nombre`, y entonces se pega a ese mensaje. Con `disable-model-invocation: true` el agente no la elige solo: hace falta la barra. Con `paths` (un glob) solo aparece cuando el agente trabaja en ficheros que coinciden. La carga es por capas (progressive disclosure): al empezar solo viajan el nombre y la description; el cuerpo entra cuando la skill se activa; los scripts, las referencias y las plantillas entran cuando el cuerpo los pide.
+2. **Por qué importa** — El cuerpo de una skill compite con el resto del contexto. Si el procedimiento vive en la regla de la raíz, se paga en cada edición y envejece lejos de quien lo mantiene. Si vive solo en la cabeza del revisor, el agente entrega trabajo que el review rechaza. La description es el disparador que el agente ve antes de abrir el cuerpo: si no dice cuándo usarla, la skill no se abre, o se abre siempre.
+3. **Best practice** — «Cuando hagas X, sigue estos pasos» es una skill. El cuerpo se queda corto (la guía del formato pide por debajo de 500 líneas) y el detalle largo va a `references/`, con una frase que diga cuándo leerlo. Un script dentro de `scripts/` corre si el agente sigue la skill: no es un hook. Si la skill nueva repite otra, el paso repetido es un enlace. En un monorepo, la skill de un paquete puede vivir junto a ese paquete: Cursor la limita a los ficheros de esa carpeta.
+4. **Ejemplo** — El equipo de pagos tiene una skill `payment-tests`. La description dice: úsala al añadir o revisar tests del servicio de pagos; no al cambiar un estilo. El cuerpo trae el comando y dos modos de fallo. El catálogo de casos raros está en `references/` y se abre solo si el test es de reintentos. Opcional, en el repo de ejemplos: la skill de tests de frontend hace lo mismo en su description, que nombra cuándo usarla (añadir, completar o revisar tests). [frontend-testing-strategy](https://github.com/novarz/grafana/blob/main/.cursor/skills/frontend-testing-strategy/SKILL.md)
+5. **Ejercicio mental** — Tu checklist de tests tiene cuarenta líneas. ¿Cuáles caben en la description, cuáles en el cuerpo y cuáles en un fichero que solo se abre si el caso aparece?
 
-1. **Qué es** — Una cascada es una skill que, en un paso, manda a abrir otra. La especializada dice «lee primero la general» y solo añade lo suyo. La general dice en qué caso hace falta la especializada. Copiar los pasos de la general dentro de la especializada no es una cascada: son dos checklists.
-2. **Por qué importa** — El día que el criterio general cambia, el agente obedece la copia y el review exige el original. El mismo fallo del capítulo 2 (una regla, un sitio), ahora entre procedimientos. El blast radius es cada turno que escribe ese tipo de test hasta que alguien nota que las dos skills discrepan.
-3. **Best practice** — Si la skill nueva repite más de un paso de otra, ese paso es un enlace y una frase de qué añade la nueva. El disparador de la especializada cabe en la descripción de la general, para que el agente sepa cuándo bajar.
-4. **Ejemplo (Grafana, opcional)** — La skill de paneles abre diciendo que se apoya en la de frontend y que hay que leerla antes. Lo suyo es el panel y el canvas. Si hace falta un selector de prueba, manda a la skill de selectores. [`.cursor/skills/panel-testing-strategy/SKILL.md`](https://github.com/novarz/grafana/blob/main/.cursor/skills/panel-testing-strategy/SKILL.md)
-5. **Ejercicio mental** — Tu skill de migraciones repite el comando de tests que ya está en otra. ¿Qué línea sustituye a esa copia?
+### Una herramienta habla con un sistema de fuera
 
-### La persona corta lo que no se deshace
+1. **Qué es** — Una herramienta (tool) es una acción que el agente puede llamar: leer un fichero, editar, ejecutar un comando, buscar. MCP (Model Context Protocol) es un protocolo para enchufar herramientas de fuera: un tracker de tickets, una base de datos, un navegador. El agente usa las que están disponibles cuando la tarea lo pide. En Cursor, cada llamada MCP pide aprobación por defecto. Los modos de ejecución (Run Modes), más abajo, deciden cuándo esa pregunta desaparece.
+2. **Por qué importa** — Una skill describe cómo hacer el trabajo dentro del repo. MCP es la puerta a un sistema que no está en el diff. Confundirlos mete credenciales y efectos externos dentro de un procedimiento que el agente abre solo. Anthropic lo trata como parte del interfaz agente-ordenador: la herramienta se diseña con el mismo cuidado que el prompt, con ejemplos, límites y argumentos difíciles de usar mal.
+3. **Best practice** — La skill dice el criterio. La herramienta hace la llamada. Si el mismo dato está en el repo y en un sistema externo, el procedimiento nombra cuál manda. Una herramienta de escritura (crear un ticket, lanzar un pago, aplicar una migración) lleva la misma parada que un push.
+4. **Ejemplo** — Para implementar un reembolso, el agente lee el ticket con el MCP del tracker y escribe el test siguiendo la skill `payment-tests`. Leer el ticket es una herramienta. El checklist del test es una skill.
+5. **Ejercicio mental** — «Crea el ticket y luego cambia el código.» ¿Qué parte es MCP y qué parte es una edición dentro del repo?
 
-1. **Qué es** — Una puerta humana (human review gate) es un borde del sistema: el agente se detiene, enseña el resumen y espera una instrucción distinta de la tarea original. En el contrato de este laboratorio la puerta está antes de `git push`. Abrir el PR empuja, así que la puerta cubre los dos. «Abre un PR» escrito en la tarea es la intención. El permiso es otra frase, dicha después de ver el diff.
-2. **Por qué importa** — Push, force-push de una rama compartida, merge y disparar otro sistema (un webhook: una llamada que otro servicio hace solo porque cambió un estado) no se deshacen con deshacer el edit. Si la skill los incluye como paso normal, el disparador «escribe el test» publica. El capítulo 0 nombró la puerta. Aquí es un papel: alguien concreto, en un punto concreto de la secuencia.
-3. **Best practice** — La skill corre el comando de validación del repo. El paso que empuja, mergea o force-pushea no va dentro de la skill. Va detrás de una parada, con el resumen delante: qué ficheros, qué comando corrió, qué no se tocó. La puerta está escrita en la raíz, no en el chat de hoy.
-4. **Ejemplo (Grafana, opcional)** — Antes de `git push`, parar y pedir aprobación explícita. Cuando el cambio está listo, mostrar el resumen y esperar. [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md), sección Human Review Gates.
-5. **Ejercicio mental** — La tarea dice «abre el PR si los tests pasan». ¿Qué frase falta para que el agente pueda empujar?
+### Un subagente es otro bucle, con otra ventana
 
-### Quien presenta arranca el producto
+1. **Qué es** — Un subagente (subagent) es otro agente al que el padre delega una subtarea. Tiene su propia ventana de contexto (el texto que el modelo puede tener delante a la vez). No ve la conversación anterior: el padre le pasa lo que necesita y recibe un resumen. Cursor lo lanza solo cuando la description le encaja, o cuando lo pides. Puede ir en primer plano (el padre espera) o en segundo plano (`is_background: true`, el padre sigue). Con `readonly: true` no edita ficheros ni corre comandos que cambien estado. Los de serie —Explore, Bash y Browser— aíslan búsquedas, logs y páginas que llenarían la ventana del padre. Uno tuyo es un markdown en `.cursor/agents/` con `name` y `description`.
+2. **Por qué importa** — Sirve cuando el trabajo es largo, ruidoso o paralelo, o cuando quieres una segunda lectura que no comparta el contexto de quien escribió el cambio. Anthropic llama orchestrator-workers a la variante en la que un modelo parte la tarea en subtareas que no estaban escritas de antemano, las reparte y junta el resultado. El padre con subagentes es esa forma. Para un procedimiento de un solo paso, la skill basta: partir el contexto no aporta.
+3. **Best practice** — Subagente: investigar varias zonas a la vez, o verificar el diff con un agente de solo lectura que no ha visto el razonamiento del padre. Skill: generar un changelog, formatear, seguir un checklist. La description es lo que el padre lee para decidir si lo llama. Tiene que decir cuándo usarlo y cuándo no.
+4. **Ejemplo** — Hay que entender cómo calculan la comisión tres servicios antes de tocar el de pagos. Tres subagentes de solo lectura, en paralelo, devuelven un resumen cada uno. El padre edita. El checklist de tests sigue siendo la skill, en la ventana del padre.
+5. **Ejercicio mental** — «Revisa este diff.» ¿Hace falta una ventana nueva, o basta con la skill de review en el mismo hilo?
 
-1. **Qué es** — En un ensayo en vivo hay dos terminales. La de la persona arranca el producto, con el Node pinado del repo, y lo deja caliente antes de la sala. La del agente edita, corre los tests que nombra la skill y se detiene. No arranca el servidor de desarrollo, ni el empaquetador del frontend (webpack), ni el comando de arranque largo del backend. El guion es de la persona: máquina, sala, tiempos. Lo que el agente cumple sigue estando en el contrato del repo.
-2. **Por qué importa** — Un servidor largo en la terminal del agente ata el ensayo a una sesión que la sala no ve, y a menudo a otro Node. El fallo típico de este laboratorio: el agente de nube trae un Node distinto del fichero `.nvmrc`, el frontend no carga, y el agente «arregla» reiniciando. Reiniciar tapa el fallo y no lo explica. El modo de fallo (failure mode) es ese: el síntoma se confunde con un bug del cambio.
-3. **Best practice** — Escribe el reparto en el harness: qué proceso arranca la persona, en qué terminal, con qué versión, y la frase que prohíbe arrancarlo desde el agente. Si la página no carga, el agente para y lo cuenta. No reinicia el producto.
-4. **Ejemplo (Grafana, opcional)** — El guion pide Grafana caliente en la terminal de login de quien presenta, con Node v24.11.0, y prohíbe arrancar webpack desde una pestaña de agente. [`.cursor/101-SCRIPT.md`](https://github.com/novarz/grafana/blob/main/.cursor/101-SCRIPT.md)
-5. **Ejercicio mental** — El día de la demo, ¿quién arranca el servidor y en qué terminal? Si la respuesta es «el agente, que es más rápido», el reparto no está escrito.
+### Un hook se ejecuta aunque el modelo no se acuerde
 
-### El restore point es un pin con nombre
+1. **Qué es** — Un hook es un programa enganchado a un momento del bucle. Cursor lo define en `.cursor/hooks.json`: un comando recibe JSON por la entrada estándar y responde JSON por la salida. Puede observar, modificar o bloquear. Ejemplos de momentos: después de editar un fichero (`afterFileEdit`), antes de un comando de terminal (`beforeShellExecution`), antes de una llamada MCP. Un código de salida `2` bloquea la acción. Un `0` usa el JSON. Otro código deja seguir la acción: ante un fallo inesperado el valor por defecto es abierto (fail-open). Hay hooks de comando y hooks de prompt (un modelo evalúa una frase). El de prompt no viaja al agente de nube. El mismo papel, fuera del editor, lo hace un check de CI: la integración continua, los controles que corren al abrir el cambio.
+2. **Por qué importa** — Una regla y una skill son texto. El modelo puede no seguirlas. El hook corre en el evento, haya o no recordado la frase. Formatear, buscar secretos o impedir un `DROP TABLE` son de este tipo: o ocurren siempre, o no son una política. Un script dentro de una skill solo corre si el agente abre la skill y obedece el paso.
+3. **Best practice** — Si la frase es «esto tiene que pasar sí o sí», el sitio es un hook o un check de CI, no una línea de `AGENTS.md`. El hook de proyecto se commitea, así viaja con el repo y lo ejecutan también los agentes de nube (los de comando; no todos los momentos existen allí). Prueba el código de salida: un script que peta con un error genérico no está bloqueando.
+4. **Ejemplo** — Tras cada edición, `afterFileEdit` lanza el formateador del repo. Antes de la terminal, un hook con salida `2` rechaza un comando que borra tablas. La regla puede recordar el porqué. Quien lo impide es el hook.
+5. **Ejercicio mental** — «Formatea siempre.» Si mañana el modelo ignora la frase, ¿qué se ha ejecutado igual?
 
-1. **Qué es** — Un restore point es un pin: un commit o una rama congelada a la que el harness vuelve. La punta de la rama de trabajo es otro sitio: se mueve con cada merge. La skill de reset es el contrato de esa vuelta (cuándo se invoca, qué deja fuera, dónde para). El script es el mecanismo: mueve el git. En este laboratorio el pin se llama `demo/start`. La skill lo aplica a `main` local, limpia los restos del ensayo y cierra los PR de ramas `cursor/*` que quedaron abiertos. El script no toca el tablero de tickets ni arranca la aplicación. La skill sí devuelve ese tablero al estado inicial, y luego para.
-2. **Por qué importa** — Volver a la punta de `main` después de mezclar el ensayo deja el ensayo dentro del producto. El siguiente grupo hereda el cambio de la demo y cree que es el estado limpio. Mover el pin, o force-pushear `main` remoto para deshacer ese merge, es otro side-effect: queda fuera del camino por defecto. Hay un segundo ref, `demo/sdfd-1-backup`, que es el paracaídas de la sesión en vivo. Volver ahí muestra el trabajo de esa sesión, no el estado limpio.
-3. **Best practice** — El harness nombra el pin y el comando. Invocar la skill de reset es la confirmación de lo que esa skill documenta, incluido cerrar los PR sobrantes del ensayo. El flag que reescribe `main` remoto, y el push que mueve el pin cuando lo mezclado es solo material del ensayo, los ejecuta una persona. La skill no pasa tickets a «en curso»: en este laboratorio eso dispara el webhook.
-4. **Ejemplo (Grafana, opcional)** — [`reset-demo`](https://github.com/novarz/grafana/blob/main/.cursor/skills/reset-demo/SKILL.md) corre `bash .cursor/reset-demo.sh`, que fija `main` local en `origin/demo/start`. `--force-push-main` reescribe `main` en GitHub; el fichero lo deja como flag, fuera del camino por defecto. Mover el pin tras un merge solo del material de ensayo es otro push: `git push origin origin/main:demo/start`.
-5. **Ejercicio mental** — El ensayo se mezcló en `main`. ¿A qué ref vuelves, y quién puede mover ese pin?
+### La persona aprueba lo que sale del bucle
 
-## Capítulo 3 · Laboratorio
+1. **Qué es** — Hay dos paradas distintas. La puerta humana (human review gate) es de producto: push, merge, una migración contra una base compartida, un pago. El agente enseña el resumen y espera una instrucción nueva. El modo de ejecución (Run Mode) es de la llamada: cuándo Cursor pregunta antes de un comando, de un MCP o de una descarga. Hay tres. Auto-review: lo de la lista permitida corre ya; otros comandos de terminal entran en un sandbox (un recinto que limita ficheros y red) cuando pueden; el resto lo mira un clasificador, que se equivoca y no es una frontera de seguridad. Las frases de `permissions.json` solo orientan a ese clasificador. Allowlist: sin preguntar corre lo que está en la lista; con el sandbox activo, un comando de terminal compatible puede correr dentro del recinto. La lista vacía sustituye al modo retirado «pregunta cada vez», que los usuarios nuevos ya no pueden elegir. Run Everything: corre todo, sin sandbox y sin clasificador. Los Cloud Agents —antes llamados Background Agents— no usan estos modos: trabajan en su propia máquina y no piden aprobación. Borrar ficheros, tocar fuera del workspace y usar el navegador pueden seguir pidiendo permiso por protecciones aparte.
+2. **Por qué importa** — Una frase en la tarea («abre el PR si los tests pasan») expresa intención. No es el permiso, y no bloquea el comando. En Auto-review, dejar el push fuera de la lista no basta: el clasificador puede dejarlo pasar. En la nube esa pregunta no existe, porque el Cloud Agent no usa estos modos. La puerta tiene que estar en el review del PR, en un hook del repo o en la protección de la rama. Plan Mode es otra parada, anterior: revisas el enfoque antes de que escriba. No sustituye a la puerta del push.
+3. **Best practice** — Lo irreversible se para en dos sitios a la vez. El texto dice que hay que esperar. El mecanismo lo hace esperar: el push no está en la allowlist, o un hook lo rechaza con salida `2`, y la persona es quien lo lanza después de leer el resumen. Auto-review no cuenta como ese mecanismo. En un agente de nube, escribe la puerta donde sí corre: el PR y el hook del repo.
+4. **Ejemplo** — La skill de migración de pagos termina en el resumen: ficheros, comando de test, y la frase de que no ha tocado la base compartida. El hook de terminal rechaza el comando que aplica esa migración. La persona lo lanza, en otra instrucción, cuando el resumen le vale.
+5. **Ejercicio mental** — Tu agente de nube tiene en `AGENTS.md` la frase «no hagas push sin preguntar». ¿Dónde está la pregunta, si ese agente no usa los modos de aprobación locales?
 
-Dos entregas, en papel. No se ejecuta nada contra el repo de ejemplos y no se mergea ninguna skill.
+### El árbol: qué pieza toca
 
-**Flujo con restore point.** Escribe la secuencia, con un sujeto por frase:
+Se recorre en este orden. La primera respuesta que encaja gana. Así el procedimiento no acaba dentro de la regla, y el push no acaba dentro de la skill.
 
-1. El pin, anotado antes de tocar nada.
-2. El agente implementa en una rama de ensayo. No hace push.
-3. La persona arranca la aplicación en su terminal y comprueba que responde.
-4. La skill de reset vuelve al pin. El agente se detiene y no rearranca la aplicación.
+```mermaid
+flowchart TD
+  A[Necesidad] --> B{Tiene que ocurrir aunque el modelo se olvide?}
+  B -->|Sí| C[Hook o check de CI]
+  B -->|No| D{Es irreversible o sale del repo?}
+  D -->|Sí| E[Puerta humana, con hook o allowlist]
+  D -->|No| F{Hace falta otra ventana o ir en paralelo?}
+  F -->|Sí| G[Subagente]
+  F -->|No| H{Es un procedimiento con disparador?}
+  H -->|Sí| I[Skill]
+  H -->|No| J[Regla o AGENTS.md]
+```
 
-Si anclas el flujo a Grafana, la skill es `reset-demo`, el pin es `origin/demo/start`, y la aplicación la arranca la persona. Un solo path.
+| Si la necesidad es… | La pieza es… | Porque… |
+| --- | --- | --- |
+| Verdad en cada edición de un ámbito | Regla con glob, regla siempre-activa, o `AGENTS.md` de la carpeta | No tiene disparador |
+| Un cómo, solo cuando la tarea aparece | Skill (`description` = disparador) | El cuerpo no debe viajar en cada edición |
+| Ruido, investigación larga o trabajo en paralelo | Subagente | Otra ventana; el padre recibe el resumen |
+| Formato, secreto, comando prohibido | Hook o check de CI | Tiene que ejecutarse igual si el modelo se olvida |
+| Push, merge, migración compartida, pago | Puerta humana, y un mecanismo que la sostenga | El texto solo no bloquea la llamada |
+| Leer o escribir un sistema de fuera | Herramienta MCP, con el Run Mode que le toque | No es un fichero del repo |
 
-**Skill nueva, solo especificación.** Redacta un `SKILL.md` de `go-migration-check`. No va al repo de Grafana. Secciones obligatorias:
+Una llamada externa puede caer en dos filas: MCP por el transporte, y puerta humana si el efecto no se deshace.
 
-- cabecera con `name` y `description`; la description dice el disparador (cuándo abrirla) y un caso en que no se abre
-- pasos que usan un comando que el repo ya tiene; si no puedes citarlo, el paso dice «pedir el comando», no inventa uno
-- dos modos de fallo («si haces X, se rompe Y»)
-- la parada: la skill no hace push, no force-pushea y no aplica la migración contra una base compartida
-- si necesita otra skill, un enlace; el texto de la otra no se pega
+### Cuatro topologías, de la simple a la compuesta
 
-Si el ancla es Grafana, las migraciones viven en `pkg/services/sqlstore/migrations/`. El contrato raíz manda probarlas con `make devenv sources=postgres_tests,mysql_tests` y después `make test-go-integration-postgres`. [AGENTS.md](https://github.com/novarz/grafana/blob/main/AGENTS.md)
-
-## Capítulo 3 · Evaluación
-
-Entregable: un diagrama de secuencia del flujo del laboratorio (o de la skill nueva, si prefieres ese turno). Actores, en este orden: usuario, agente, skill, shell, CI, humano. CI es la integración continua: los checks que corren cuando el cambio ya salió del editor.
-
-La forma de referencia. El tuyo sustituye las etiquetas genéricas por el nombre de la skill, el comando y la acción exacta que espera.
+1. **Qué es** — La topología es el dibujo de qué pieza habla con cuál. Se parte de una caja y se añade la siguiente cuando un fallo repetido la justifica. Cuatro formas cubren casi todo. **Agente y reglas:** un bucle, con el `AGENTS.md` y las reglas de ámbito. **Agente y skills:** lo anterior, más un procedimiento que se abre por la description. **Orquestador y subagentes:** el padre parte el trabajo y junta resúmenes. **Cualquiera de las tres, con borde:** un hook en el evento y una persona en lo irreversible.
+2. **Por qué importa** — Cada caja nueva gasta contexto, latencia y un sitio donde dos instrucciones pueden chocar. Anthropic recomienda añadir complejidad solo cuando el resultado mejora. Un subagente para un cambio de una función es esa caja de más.
+3. **Best practice** — Dibuja primero agente, reglas y la puerta del push. Añade una skill por cada procedimiento que se repita. Añade un subagente cuando el padre no puede nombrar las subtareas por adelantado o cuando el ruido no cabe en su ventana. El hook se dibuja en la flecha del comando, no como un quinto agente. La secuencia de abajo es la forma compuesta, cuando las cuatro piezas hacen falta a la vez.
 
 ```mermaid
 sequenceDiagram
-  actor Usuario
+  actor Persona
   participant Agente
   participant Skill
-  participant Shell
-  participant CI
-  actor Humano
-  Usuario->>Agente: tarea dentro de una frontera
-  Agente->>Agente: lee raíz y zona
-  Agente->>Skill: la tarea coincide con el disparador
-  Skill->>Shell: comando canónico del repo
-  Shell-->>Agente: pasa o falla
-  Agente->>Humano: resumen y parada
-  Humano->>Agente: aprobación explícita
-  Agente->>CI: push y PR
-  CI-->>Humano: checks
+  participant Subagente
+  participant Hook
+  Persona->>Agente: tarea
+  Note over Agente: reglas y AGENTS.md ya cargados
+  Agente->>Subagente: subtarea, con el contexto que necesita
+  Subagente-->>Agente: resumen
+  Agente->>Skill: la tarea coincide con la description
+  Skill-->>Agente: pasos y comando
+  Hook-->>Agente: permite o bloquea el comando
+  Agente->>Persona: resumen y parada
+  Persona->>Agente: aprobación explícita
 ```
+
+4. **Ejemplo** — Pagos, en un día normal: un agente, el `AGENTS.md` de `services/payments/`, la skill de tests si el cambio lleva tests, y la persona antes del push. El día en que hay que entender tres servicios, se añaden subagentes de solo lectura. El formateador no se añade como frase: ya está en el hook.
+5. **Ejercicio mental** — Dibuja tu repo con el mínimo de cajas. ¿Qué fallo repetido justificaría la caja que estás a punto de añadir?
+
+## Capítulo 3 · Laboratorio
+
+Caso, sin abrir un repo concreto. Equipo de pagos, monorepo con `web/` y `services/payments/`. Clasifica cada necesidad en una pieza y escribe una frase de por qué. Si una necesidad cae en dos piezas, dilo.
+
+1. En `web/`, los componentes exportan por nombre.
+2. Al escribir tests del servicio de pagos, hay un checklist y un comando.
+3. Hay que leer cómo calculan la comisión tres servicios, antes de editar.
+4. El formateador tiene que correr después de cada edición.
+5. Aplicar una migración contra la base compartida, o desplegar.
+6. Leer el ticket en el tracker del equipo.
+
+Segunda entrega: un `SKILL.md` de `db-migration-check`, solo en papel. Cabecera con `name` y `description`. La description dice cuándo abrirla y un caso en que no. El cuerpo tiene el comando del repo (o la frase «pedir el comando» si no puedes citarlo), dos modos de fallo y la parada antes de la base compartida. Si hay detalle que no hace falta en cada activación, di en qué fichero de `references/` vive y qué frase del cuerpo manda a abrirlo.
+
+Tercera entrega: el diagrama de la topología de este equipo, con la puerta visible.
+
+## Capítulo 3 · Rúbrica
 
 | Criterio | Aprueba | No aprueba |
 | --- | --- | --- |
-| Disparador | Se distingue regla, skill y persona en el flujo | Todo paso es «el agente lo hace» |
-| Parada | La flecha hacia CI sale después del humano | El agente empuja porque la tarea decía «abre el PR» |
-| Skill | El `SKILL.md` tiene disparador, comando real, dos fallos y la parada | Una checklist genérica, o un comando que el repo no tiene |
-| Cascada | Si repite otra skill, enlaza | Pega el procedimiento entero |
-| Pin | El flujo nombra el restore point y quién vuelve a él | «Volver a main» sin decir qué commit |
-
-Alguien que no conoce el producto tiene que poder narrar el diagrama en voz alta: cuándo se abre la skill, dónde se para, y qué se recupera con el pin.
+| Pieza | Cada necesidad del laboratorio cae en la fila del árbol, con la frase que lo justifica | Todo es «una regla» o todo es «el agente ya sabe» |
+| Doble fila | Migración y deploy nombran la puerta y el mecanismo que la sostiene | Una frase en `AGENTS.md` se da por suficiente |
+| Skill | `name`, `description` con disparador, cuerpo corto, parada, y el detalle largo fuera del cuerpo | Un ensayo de cuarenta líneas sin disparador, o un comando inventado |
+| Topología | Se ve el agente, lo que se carga siempre, lo que se abre por disparador y dónde se para | Cajas sin flechas, o un subagente para el formateador |
+| Lectura | Alguien que no conoce el repo narra el dibujo | Hace falta conocer un producto para seguirlo |
 
 ## Capítulo 3 · Anti-patrones
 
-### Un agente monolítico, sin skills
+### La política vive solo en el prompt
 
-1. **Qué es** — Todo el cómo vive en el prompt del turno o en un único fichero de instrucciones: tests, reset, migraciones, selectores.
-2. **Por qué importa** — El procedimiento se carga en turnos que no lo piden, y el que sí lo pide recibe una versión que nadie mantiene. El review rechaza el diff por un criterio que no estaba en el disparador.
-3. **Best practice** — Lo que tiene disparador se va a una skill. La raíz se queda con las reglas que valen en cualquier PR.
-4. **Ejercicio mental** — ¿Qué trozo de tu último prompt solo servía para un tipo de tarea? Ese trozo es una skill que todavía no existe.
+1. **Qué es** — «Nunca hagas push», «formatea siempre» y «no toques la base compartida» están en `AGENTS.md` o en el chat. No hay hook, ni check, ni comando fuera de la lista permitida.
+2. **Por qué importa** — El bucle puede no seguir la frase. El review cree que la puerta existe. En un Cloud Agent la pregunta local ni siquiera aparece.
+3. **Best practice** — El texto explica el porqué. El hook, el CI o la allowlist hacen que ocurra. Las frases de Auto-review no cuentan como hook: orientan a un clasificador que se equivoca.
+4. **Ejercicio mental** — Tacha del `AGENTS.md` cada frase que tenga que cumplirse aunque el modelo la ignore. ¿Dónde se va cada una?
 
-### La skill publica sola
+### Un subagente para un checklist
 
-1. **Qué es** — El procedimiento de implementar termina en `git push`, en abrir el PR, en mergear o en force-pushear, sin una parada escrita.
-2. **Por qué importa** — El disparador «haz el cambio» se convierte en permiso para un side-effect. El review ve el PR cuando ya no puede impedir el push. Deshacer en la rama remota es otro incidente.
-3. **Best practice** — La skill acaba en el resumen: ficheros, comando, resultado. La frase siguiente la dice una persona.
-4. **Ejercicio mental** — Tacha de tu skill cada línea que no puedas deshacer con otro commit. Lo tachado, ¿tiene una parada delante?
+1. **Qué es** — Formatear, escribir el changelog o seguir el checklist de tests se delega en un subagente con su propia ventana.
+2. **Por qué importa** — El padre le reenvía el contexto, espera un resumen y no gana aislamiento: la tarea cabía en un paso. Cursor lo dice en la guía de subagentes: eso es una skill.
+3. **Best practice** — Subagente cuando el ruido o el paralelismo no caben en la ventana del padre. Skill cuando el procedimiento es uno y se repite.
+4. **Ejercicio mental** — ¿Qué dato de la conversación perdería el subagente, y hace falta de verdad que lo pierda?
 
-### Volver a la punta de main
+### El clasificador como candado
 
-1. **Qué es** — Después del ensayo, alguien restaura haciendo checkout de la rama principal, o borra la rama de trabajo y da por limpio el repo. El pin con nombre no se usa.
-2. **Por qué importa** — Si el ensayo se mezcló, esa punta ya es el ensayo. El grupo siguiente construye encima. En este laboratorio el pin es `demo/start`. Otro ref guardado como paracaídas de la sesión en vivo tampoco es el estado limpio.
-3. **Best practice** — El comando de restauración está en la skill, nombra el pin, y no reescribe la rama remota salvo flag explícito de una persona.
-4. **Ejercicio mental** — Si mañana el pin y la rama principal divergen, ¿cuál de los dos enseñas como estado inicial, y dónde está escrito?
+1. **Qué es** — El equipo deja Run Everything, o escribe en `permissions.json` «bloquea los push» y da por cerrada la puerta. En la nube asume que el agente preguntará, porque en local pregunta.
+2. **Por qué importa** — Auto-review es una orientación, y la propia documentación dice que no es una frontera de seguridad. Run Everything no pregunta. El Cloud Agent no usa esos modos.
+3. **Best practice** — Lo que no puede ocurrir se bloquea con un hook de salida `2` o fuera del editor, en el CI y en la protección de la rama. La persona ve el resumen antes.
+4. **Ejercicio mental** — Si el clasificador permite el comando, ¿qué otra pieza lo impide?
 
 ## Límite de este capítulo
 
-La topología dice quién actúa. No inventaría las herramientas permitidas: eso es el capítulo 4. No sustituye el pipeline de CI ni los dueños: eso es el capítulo 5. Una skill con el comando correcto, que aun así empuja, suspende la rúbrica.
+Esto elige la pieza. No reescribe el fichero de zona: eso es el capítulo 2. No inventaría los comandos del repo ni el pipeline de CI: eso son los capítulos 4 y 5. Un hook cuyo script sale con un código distinto de `0` y de `2` deja seguir la acción. Y una topología con todas las piezas encendidas a la vez no es más segura: es más difícil de explicar en voz alta.
 
-Hay una contradicción real en el laboratorio, comprobada el mismo día, entre dos ficheros. El contrato raíz prohíbe arrancar el servidor desde el agente y prohíbe el push sin aprobación. En la sala, el guion coincide con lo primero: la persona arranca Grafana y el prompt del agente de nube lo repite. Ese mismo prompt de sala, y el prompt desatendido del 201, dicen abrir el PR sin esperar review. El del 201 además manda arrancar el servidor (no el `make run`) y prohíbe el merge. Hasta que la raíz nombre esas frases como excepción de ensayo, el agente tiene dos contratos. Este capítulo enseña el de la raíz.
+## Fuentes
+
+Consultadas el 8 oct 2026.
+
+- Reglas, tipos y `AGENTS.md` en Cursor: [cursor.com/docs/rules](https://cursor.com/docs/rules)
+- Skills, `SKILL.md`, `paths` y `disable-model-invocation`: [cursor.com/docs/skills](https://cursor.com/docs/skills)
+- Subagentes: [cursor.com/docs/subagents](https://cursor.com/docs/subagents)
+- Hooks: [cursor.com/docs/hooks](https://cursor.com/docs/hooks)
+- Modos de ejecución y sandbox: [cursor.com/docs/agent/security/run-modes](https://cursor.com/docs/agent/security/run-modes)
+- MCP y aprobación de herramientas: [cursor.com/docs/mcp](https://cursor.com/docs/mcp)
+- `permissions.json`: [cursor.com/docs/reference/permissions](https://cursor.com/docs/reference/permissions)
+- Cloud Agents (antes Background Agents): [cursor.com/docs/cloud-agent](https://cursor.com/docs/cloud-agent)
+- Plan Mode: [cursor.com/docs/agent/plan-mode](https://cursor.com/docs/agent/plan-mode)
+- Debug Mode: [cursor.com/docs/agent/debug-mode](https://cursor.com/docs/agent/debug-mode)
+- Modos del CLI (Agent, Plan, Ask): [cursor.com/docs/cli/overview](https://cursor.com/docs/cli/overview)
+- Formato abierto `AGENTS.md`: [agents.md](https://agents.md/)
+- Formato de skills y carga por capas: [agentskills.io/specification](https://agentskills.io/specification)
+- Workflows, agentes, orchestrator-workers y pausa humana: [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents) (Anthropic, 19 dic 2024). La página avisa de que el ecosistema de herramientas ha cambiado desde entonces. Este capítulo usa las distinciones de arquitectura, no el catálogo de frameworks.

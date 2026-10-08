@@ -96,32 +96,32 @@ Se leen sin Grafana. En los capítulos, cada uno se despliega igual: **principio
 
 **Por qué.** Un atajo de demo en la rama real, o una regla de producto tratada como ensayo, cambian el blast radius sin que el review lo vea.
 
-**Práctica.** En las instrucciones, marcar qué es ensayo y qué es sistema. El punto de restauración es un pin con nombre y un comando. Mover el pin lo hace una persona.
+**Práctica.** En las instrucciones, marcar qué es ensayo y qué es sistema, y dejar escrito el comando de restauración.
 
-### 13. Un turno tiene cuatro papeles
+### 13. Cada necesidad tiene una pieza
 
-**Qué.** Agente generalista (edita dentro de la frontera), skill (procedimiento con disparador), humano (puertas y procesos que no arranca el agente), harness (vuelve a un pin conocido).
+**Qué.** Regla: verdad en cada edición de un ámbito. Skill: procedimiento con disparador, cargado por capas. Subagente: otro bucle con ventana propia, para aislar contexto o ir en paralelo. Hook o check de CI: se ejecuta aunque el modelo se olvide. Puerta humana: lo irreversible o lo que sale del repo.
 
-**Por qué.** Un solo agente que hace de los cuatro elige el procedimiento, publica y deja el repo sin forma de volver.
+**Por qué.** El procedimiento dentro de la regla se carga siempre. La frase «nunca hagas push» no impide el comando. Un subagente para un checklist parte el contexto sin ganar nada.
 
-**Práctica.** Una línea antes del turno: quién edita, qué skill si aplica, qué espera a la persona, cuál es el pin.
+**Práctica.** Cinco preguntas, en este orden: ¿tiene que ocurrir aunque el modelo se olvide? ¿es irreversible o sale fuera? ¿hace falta otra ventana o ir en paralelo? ¿es un cómo con disparador? ¿es verdad en cada edición de este ámbito?
 
-### 14. Regla, skill o persona
+### 14. El texto no es un candado
 
-**Qué.** La regla vale en cada edición de su ámbito. La skill se abre cuando la tarea coincide con el disparador. La persona entra si el paso publica, mergea, force-pushea o dispara otro sistema.
+**Qué.** Reglas y skills entran en el prompt. Un hook (programa enganchado a un momento del bucle) o un check de CI se ejecuta. Los modos de ejecución deciden cuándo una llamada a terminal o MCP pide aprobación. Las frases de Auto-review orientan al clasificador.
 
-**Por qué.** Meter el procedimiento en la raíz lo carga siempre. Meter la puerta dentro de la skill hace que un disparador publique. Pedir aprobación para cada test esconde la puerta de verdad.
+**Por qué.** Una política escrita y un push en la lista de comandos permitidos conviven. El review cree que hay puerta y el comando sale solo. Un agente de nube no usa esos modos locales.
 
-**Práctica.** Tres preguntas: ¿vale en cada edición? ¿es un cómo con disparador? ¿publica, mergea o dispara otro sistema? Regla, skill, persona.
+**Práctica.** Lo que debe cumplirse siempre vive en un hook o en CI. Lo irreversible, además, espera a una persona. En la nube, la puerta está en el PR, en el hook del repo o en la rama.
 
-### 15. Una skill llama; no copia
+### 15. Se compone de lo simple a lo compuesto
 
-**Qué.** La skill especializada manda a leer la general y solo escribe lo suyo. La general dice en qué caso hace falta la especializada.
+**Qué.** La topología por defecto es un agente y sus reglas. Se añade una skill cuando el procedimiento se repite. Se añaden subagentes cuando el padre no puede prever las subtareas o el ruido no cabe en su ventana. El hook y la persona van en el borde.
 
-**Por qué.** Dos copias del mismo procedimiento: el review exige una y el agente obedece la otra.
+**Por qué.** Cada pieza extra gasta contexto y crea otro sitio donde dos instrucciones pueden chocar.
 
-**Práctica.** Si la skill nueva repite más de un paso de otra, ese paso es un enlace.
+**Práctica.** Dibuja primero una caja. La segunda caja nombra el fallo repetido que la justifica.
 
 ---
 
-**En voz alta, sin nombrar un producto.** Una frontera es un contrato: cadena de herramientas, dueños y validación propia; un turno de agente cabe en una. El blast radius es quién se rompe si el cambio va mal o llega solo a medias. El contexto se apila: contrato del repo, reglas de la zona cuando el glob coincide, un procedimiento solo si la tarea lo pide, y la guía humana por un enlace. Una skill se abre cuando la tarea coincide con su disparador; una regla vale en cada edición de su zona; publicar o un efecto difícil de deshacer espera a una persona. El restore point es el pin al que el harness vuelve, no la punta de la rama de trabajo.
+**En voz alta, sin nombrar un producto.** Una frontera es un contrato: cadena de herramientas, dueños y validación propia; un turno de agente cabe en una. El blast radius es quién se rompe si el cambio va mal o llega solo a medias. El contexto se apila: contrato del repo, reglas de la zona cuando el glob coincide, un procedimiento solo si la tarea lo pide, y la guía humana por un enlace. Para cada necesidad, una pieza: regla si es verdad en cada edición, skill si es un procedimiento con disparador, subagente si hace falta otra ventana, hook o CI si tiene que ocurrir igual, persona si el efecto sale del repo.

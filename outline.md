@@ -81,27 +81,28 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 
 ---
 
-## Capítulo 3 — Agent topology: skills, scripts, humanos y especialización
+## Capítulo 3 — Agent topology: rules, skills, subagentes, hooks y puertas
 
 **Objetivos**
-- Modelar el turno como reparto: agente generalista, skill, humano y harness con restore point.
-- Decidir cuándo abrir una skill, cuándo basta la raíz o la zona, y cuándo parar para una persona.
+- Nombrar las piezas de un turno y cuándo se carga cada una.
+- Elegir pieza con un árbol: regla, skill, subagente, hook o CI, puerta humana.
+- Componer de lo simple a lo compuesto: agente y reglas, más skills, más subagentes, con borde.
 
 **Deep-dive**
-- Cuatro papeles. Regla permanente frente a skill con disparador frente a puerta humana.
-- Una skill llama a otra (panel → frontend-testing → selectores); no copia el procedimiento.
-- Quien presenta arranca el producto. El agente no. El restore point es un pin con nombre (`demo/start`), y el script solo mueve el git.
-- Push, force-push, merge y un webhook no van en el paso por defecto de una skill.
+- El agente es un bucle; un workflow tiene el camino escrito. Reglas de Cursor (siempre, glob, a petición del agente, manual) y `AGENTS.md`.
+- Skill con carga por capas. MCP para sistemas de fuera. Subagente cuando hace falta otra ventana. Hook cuando tiene que ocurrir igual.
+- Run Modes y Cloud Agents: el texto no bloquea un comando. La puerta humana necesita un mecanismo.
+- Texto: `capitulos/03-topologia-agentes.md`.
 
 **Lab**
-- Simular el flujo: pin anotado, agente en rama de ensayo sin push, la persona arranca la app, `reset-demo` vuelve al pin.
-- Especificar una skill nueva «go-migration-check» (solo `SKILL.md`, sin merge). Texto: `capitulos/03-topologia-agentes.md`.
+- Caso de un equipo de pagos: clasificar estilo, checklist de tests, investigación en paralelo, formateador, migración o deploy, y lectura de un ticket.
+- Especificar una skill `db-migration-check` y dibujar la topología.
 
 **Evaluación**
-- Diagrama de secuencia: usuario → agente → skill → shell → CI → humano, con la parada antes del push. Rúbrica de la skill.
+- Rúbrica: pieza justificada, skill con disparador y parada, topología con la puerta visible, narrable sin conocer el producto.
 
 **Anti-patrones**
-- Agente monolítico sin skills. Skill que publica o force-pushea sin parada. Restaurar a la punta de `main` en vez del pin `demo/start`.
+- Política solo en el prompt. Subagente para un checklist. Tratar el clasificador de Auto-review, o la pregunta local, como candado del agente de nube.
 
 ---
 
