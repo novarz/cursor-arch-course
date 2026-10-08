@@ -14,7 +14,7 @@ Se leen sin Grafana. En los capítulos, cada uno se despliega igual: **principio
 
 **Qué.** Instrucciones, comandos, hooks, checks y dueños están versionados. El chat los consulta.
 
-**Por qué.** Un prompt no llega al siguiente agente ni al siguiente review.
+**Por qué.** El modelo no retiene memoria entre respuestas. Un prompt no llega al siguiente agente ni al siguiente review.
 
 **Práctica.** Toda restricción de mañana se commitea en su capa. El chat no es un almacén.
 
@@ -60,7 +60,7 @@ Se leen sin Grafana. En los capítulos, cada uno se despliega igual: **principio
 
 ### 8. El contexto se apila
 
-**Qué.** Raíz (vale para cualquier PR) → zona activada por un glob (patrón de rutas) → skill (procedimiento que se abre solo si la tarea lo pide) → guía humana por enlace.
+**Qué.** Raíz (vale para cualquier PR) → zona de la frontera (`AGENTS.md` de la carpeta, o regla con glob) → skill (procedimiento que se abre solo si la tarea lo pide) → guía humana por enlace.
 
 **Por qué.** Un solo fichero o se desfasa o impone a todo el repo las normas de un equipo. Cargar de menos pisa el contrato de la frontera.
 
@@ -86,17 +86,17 @@ Se leen sin Grafana. En los capítulos, cada uno se despliega igual: **principio
 
 **Qué.** Empujar, abrir el PR o disparar un efecto difícil de deshacer es un borde del sistema, no un detalle del prompt.
 
-**Por qué.** «Abre un PR» en la tarea expresa intención. La aprobación es otra instrucción, explícita.
+**Por qué.** «Abre un PR» en la tarea expresa intención. La aprobación es otra instrucción, explícita. La frase no bloquea el comando.
 
-**Práctica.** El agente se detiene, enseña el resumen y espera. La puerta está escrita en la raíz.
+**Práctica.** La raíz nombra la puerta y el resumen que hay que enseñar. El mecanismo que hace esperar —hook, lista de aprobación, o la persona que lanza el push— es el capítulo 3.
 
-### 12. El ensayo no es el producto
+### 12. Cada fichero tiene una capa
 
-**Qué.** Un harness tiene estado inicial conocido, forma de volver a él, y un reparto de quién arranca procesos. Esas reglas no viajan al producto. Fronteras, CI y ownership sí.
+**Qué.** Código, contexto del agente, proceso humano, CI y entorno. Un turno escribe en una.
 
-**Por qué.** Un atajo de demo en la rama real, o una regla de producto tratada como ensayo, cambian el blast radius sin que el review lo vea.
+**Por qué.** Cambiar un check o los dueños para que el PR pase cambia las reglas del sistema, y el review de producto no mira eso.
 
-**Práctica.** En las instrucciones, marcar qué es ensayo y qué es sistema, y dejar escrito el comando de restauración.
+**Práctica.** Quién se rompe si este fichero cambia. Si la respuesta no es el producto de este turno, no se edita.
 
 ### 13. Cada necesidad tiene una pieza
 
@@ -124,4 +124,4 @@ Se leen sin Grafana. En los capítulos, cada uno se despliega igual: **principio
 
 ---
 
-**En voz alta, sin nombrar un producto.** Una frontera es un contrato: cadena de herramientas, dueños y validación propia; un turno de agente cabe en una. El blast radius es quién se rompe si el cambio va mal o llega solo a medias. El contexto se apila: contrato del repo, reglas de la zona cuando el glob coincide, un procedimiento solo si la tarea lo pide, y la guía humana por un enlace. Para cada necesidad, una pieza: regla si es verdad en cada edición, skill si es un procedimiento con disparador, subagente si hace falta otra ventana, hook o CI si tiene que ocurrir igual, persona si el efecto sale del repo.
+**En voz alta, sin nombrar un producto.** Una frontera es un contrato: cadena de herramientas, dueños y validación propia; un turno de agente cabe en una. El blast radius es quién se rompe si el cambio va mal o llega solo a medias. El contexto se apila: contrato del repo, la zona de la frontera (carpeta o glob), un procedimiento solo si la tarea lo pide, y la guía humana por un enlace. Para cada necesidad, una pieza: regla si es verdad en cada edición, skill si es un procedimiento con disparador, subagente si hace falta otra ventana, hook o CI si tiene que ocurrir igual, persona si el efecto sale del repo.
