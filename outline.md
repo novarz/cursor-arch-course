@@ -14,25 +14,25 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 
 - Experiencia con monorepos (FE+BE), CI/CD, y code review.
 - Uso básico de Cursor (Agent / Chat / Rules) — no se enseña “cómo abrir el IDE”.
-- Lectura previa obligatoria: `AGENTS.md` completo + `.cursor/101-SCRIPT.md` (skim).
+- `example-map.md` es opcional: rutas cuando haga falta un ancla, no la lectura del capítulo.
 
 ---
 
 ## Capítulo 0 — Framing: de “asistente de código” a sistema agentic
 
 **Objetivos**
-- Distinguir tool-use ad-hoc vs arquitectura de agentes con fronteras, estado y pipelines.
-- Mapear Grafana como sistema de estudio: monorepo + demo Cursor + proceso OSS.
+- Distinguir un chat que escribe código de un sistema con frontera, estado durable y pipeline.
+- Nombrar la capa del turno y dejar la puerta humana nombrada, sin confundir la frase con el mecanismo.
 
 **Deep-dive**
-- Sistema agentic = frontera + estado durable + pipeline. La norma vive en el repo, no en el chat.
-- Cuatro capas (código, contexto, proceso humano, CI/entorno). El harness tiene punto de restauración; el ensayo no es el producto.
+- Sistema agentic = frontera + estado que sobrevive al chat + salida (tests, dueños, una persona). El modelo no recuerda el chat: la norma vive en el repo.
+- Cuatro capas (código, contexto, proceso humano, CI/entorno). Un turno escribe en una.
 
 **Lab**
-- Cinco artefactos de cualquier sistema, clasificados por capa. Como mucho un path de Grafana. Texto: `capitulos/00-01-caso-grafana.md`.
+- Cinco artefactos de un sistema conocido, clasificados por capa. Texto: `capitulos/00-01-sistema-y-fronteras.md`.
 
 **Evaluación**
-- Diagrama de una página: humano / agente / CI / estado durable. Aprueba si alguien que no conoce el producto dice dónde se detiene el agente.
+- Diagrama de una página: humano / agente / CI / estado durable. Aprueba si alguien que no conoce el producto dice dónde se detiene el agente, y distingue la frase de la puerta del mecanismo.
 
 **Anti-patrones**
 - Archivar el fichero de instrucciones tras leerlo una vez. Ignorar dueños y cadencias.
@@ -50,7 +50,7 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 - Un PR por cadencia. Se edita la fuente y se regenera. El tamaño de un turno es el número de fronteras que cruza.
 
 **Lab**
-- «Cambiar el título de un panel»: plan de solo presentación y plan de cambio de modelo. Texto: `capitulos/00-01-caso-grafana.md`.
+- «Cambiar cómo se muestra el nombre del comercio en un recibo»: plan de solo presentación y plan de cambio de modelo. Texto: `capitulos/00-01-sistema-y-fronteras.md`.
 
 **Evaluación**
 - Matriz: frontera × blast radius × tests × dueños × PRs × comando de generación.
@@ -67,11 +67,11 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 - Evitar duplicación y drift entre docs humanas y agent instructions.
 
 **Deep-dive**
-- Pila: raíz → zona con glob → skill → guía humana por enlace.
-- La zona especializa y no revoca la raíz. Una regla, un sitio. Cada fichero nombra un comando real y dos modos de fallo.
+- Pila: raíz → zona (AGENTS.md de la carpeta, o regla con glob) → skill si la tarea lo pide → guía por enlace.
+- La zona puede concretar la raíz; un conflicto silencioso no lo gana la raíz. En ejecución manda la instrucción más específica. Una regla, un sitio. Comando real y dos modos de fallo.
 
 **Lab**
-- AGENTS de zona ficticio (glob, enlaces, skill, tres reglas locales, dos fallos) y tres choques raíz/zona para revisar. Destino Grafana opcional: `pkg/tsdb/`. Texto: `capitulos/02-contexto-agentes.md`.
+- Fichero de zona del servicio de pagos (carpeta o glob, enlaces, skill, tres reglas, dos fallos) y tres choques raíz/zona. Texto: `capitulos/02-contexto-agentes.md`.
 
 **Evaluación**
 - Rúbrica: accionable, acotado, referencial, modos de fallo, compatible con la raíz.
@@ -81,27 +81,28 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 
 ---
 
-## Capítulo 3 — Agent topology: skills, scripts, humanos y especialización
+## Capítulo 3 — Agent topology: rules, skills, subagentes, hooks y puertas
 
 **Objetivos**
-- Modelar topologías: agente generalista + skills + human-in-the-loop + reset harness.
-- Definir cuándo invocar skill vs leer AGENTS vs pedir aprobación humana.
+- Nombrar las piezas de un turno y cuándo se carga cada una.
+- Elegir pieza con un árbol: regla, skill, subagente, hook o CI, puerta humana.
+- Componer de lo simple a lo compuesto: agente y reglas, más skills, más subagentes, con borde.
 
 **Deep-dive**
-- `.cursor/skills/*/SKILL.md`: reset-demo, frontend-testing-strategy, panel-testing-strategy, add-e2e-selectors.
-- Cascada de skills (panel → frontend-testing).
-- Presenter topology: `.cursor/101-SCRIPT.md` + restricciones “no arrancar webpack desde agent terminal”.
-- Human Review Gates antes de `git push` / PR.
+- El agente es un bucle; un workflow tiene el camino escrito. Reglas de Cursor (siempre, glob, a petición del agente, manual) y `AGENTS.md`.
+- Skill con carga por capas. MCP para sistemas de fuera. Subagente cuando hace falta otra ventana. Hook cuando tiene que ocurrir igual.
+- Run Modes y Cloud Agents: el texto no bloquea un comando. La puerta humana necesita un mecanismo.
+- Texto: `capitulos/03-topologia-agentes.md`.
 
 **Lab**
-- Simular un flujo 201: agente implementa en branch demo; humano arranca Grafana; skill reset-demo restaura pin.
-- Diseñar una skill nueva “go-migration-check” (solo especificación SKILL.md, sin merge al repo).
+- Caso de un equipo de pagos: clasificar estilo, checklist de tests, investigación en paralelo, formateador, migración o deploy, y lectura de un ticket.
+- Especificar una skill `db-migration-check` y dibujar la topología.
 
 **Evaluación**
-- Diagrama de secuencia: usuario → agente root → skill → shell → CI → humano.
+- Rúbrica: pieza justificada, skill con disparador y parada, topología con la puerta visible, narrable sin conocer el producto.
 
 **Anti-patrones**
-- Agente monolítico sin skills; skills que ejecutan side-effects irreversibles sin confirmación; olvidar el restore point `demo/start`.
+- Política solo en el prompt. Subagente para un checklist. Tratar el clasificador de Auto-review, o la pregunta local, como candado del agente de nube.
 
 ---
 
@@ -305,5 +306,5 @@ Cada capítulo incluye: objetivos de aprendizaje, lecture deep-dive, laboratorio
 1. **Principio, luego un ancla:** cada idea se entiende sin Grafana; como mucho un path por sección. El inventario de rutas vive en `example-map.md`.
 2. **Sistemas > prompts:** se diseña contexto, topología, pipelines y evaluación.
 3. **Human gates son feature, no bug:** la aprobación explícita es parte de la arquitectura.
-4. **Demo ≠ prod:** el fork Cursor enseña harnesses; las lecciones de security/CI aplican al Grafana real.
+4. **El ejemplo no es la lección:** novarz/grafana aporta un path cuando ilustra una idea general. El guion de la demo no es el temario.
 5. **Profundidad:** se prioriza razonamiento de blast radius y failure modes sobre velocidad de codegen.
